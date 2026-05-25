@@ -197,9 +197,25 @@ All content here is synthetic and isolated from production systems.</p>
 </body></html>`)
     }))
 
+    // Dashboard (with optional basic auth)
+    this.app.get('/agentgate-dashboard', (req, res) => {
+      const policy = this.agentGate.getPolicy()
+      if (policy.dashboard?.require_auth) {
+        const token = process.env.AGENTGATE_DASHBOARD_TOKEN || ''
+        const auth = req.headers['authorization'] || ''
+        const expected = 'Basic ' + Buffer.from('admin:' + token).toString('base64')
+        if (!token || auth !== expected) {
+          res.setHeader('WWW-Authenticate', 'Basic realm="AgentGate Dashboard"')
+          res.status(401).send('401 Unauthorized')
+          return
+        }
+      }
+      res.type('text/html').send(this.renderDashboard())
+    })
+
     // Health
     this.app.get('/health', (_, res) => {
-      res.json({ status: 'ok', pages_count: HONEYPOT_PAGES.length, api_count: HONEYPOT_API_ENDPOINTS.length })
+      res.json({ status: 'ok' })
     })
   }
 

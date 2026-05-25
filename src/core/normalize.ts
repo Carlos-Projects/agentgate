@@ -3,11 +3,21 @@
  * Converts framework-specific requests to AgentGate RequestContext
  */
 
-import { RequestContext, AdapterRequest } from './types';
+import * as crypto from 'crypto'
+import { RequestContext, AdapterRequest, PrivacyConfig } from './types'
 
-export function normalizeRequest(req: AdapterRequest): RequestContext {
+export function normalizeRequest(
+  req: AdapterRequest,
+  privacy?: PrivacyConfig
+): RequestContext {
+  const shouldHash = privacy?.hash_ip ?? true
+  const ipHash = shouldHash ? hashIp(req.ip) : req.ip
+  const ipRaw = privacy?.log_raw_ip ? req.ip : undefined
+
   return {
-    ip: req.ip,
+    ip: ipHash, // Use hash for rate limiting and logging
+    ipHash,
+    ipRaw,
     path: req.path,
     method: req.method,
     userAgent: req.userAgent || '',
@@ -17,7 +27,12 @@ export function normalizeRequest(req: AdapterRequest): RequestContext {
     headers: req.headers || {},
     timestamp: Date.now(),
     jsExecuted: req.jsExecuted,
-  };
+  }
+}
+
+export function hashIp(ip: string, salt?: string): string {
+  const data = salt ? `${ip}:${salt}` : ip
+  return crypto.createHash('sha256').update(data).digest('hex')
 }
 
 export function extractClientIP(headers: Record<string, string>): string {
@@ -29,36 +44,36 @@ export function extractClientIP(headers: Record<string, string>): string {
     'x-client-ip',
     'forwarded-for',
     'forwarded',
-  ];
+  ]
 
   for (const header of ipHeaders) {
-    const value = headers[header];
+    const value = headers[header]
     if (value) {
       // x-forwarded-for can contain multiple IPs
-      const ips = value.split(',').map((ip) => ip.trim());
+      const ips = value.split(',').map((ip) => ip.trim())
       if (ips[0]) {
-        return ips[0];
+        return ips[0]
       }
     }
   }
 
-  return 'unknown';
+  return 'unknown'
 }
 
 export function parseCookies(cookieHeader?: string): Record<string, string> {
   if (!cookieHeader) {
-    return {};
+    return {}
   }
 
-  const cookies: Record<string, string> = {};
-  const pairs = cookieHeader.split(';');
+  const cookies: Record<string, string> = {}
+  const pairs = cookieHeader.split(';')
 
   for (const pair of pairs) {
-    const [key, ...valueParts] = pair.split('=');
+    const [key, ...valueParts] = pair.split('=')
     if (key) {
-      cookies[key.trim()] = valueParts.join('=').trim();
+      cookies[key.trim()] = valueParts.join('=').trim()
     }
   }
 
-  return cookies;
+  return cookies
 }

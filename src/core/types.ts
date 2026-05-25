@@ -32,6 +32,8 @@ export interface Signal {
 
 export interface RequestContext {
   ip: string;
+  ipHash: string;
+  ipRaw?: string;
   path: string;
   method: string;
   userAgent: string;
@@ -80,6 +82,78 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
   },
 };
 
+// Privacy configuration
+export interface PrivacyConfig {
+  hash_ip: boolean;
+  log_raw_ip: boolean;
+}
+
+// Rate limit configuration
+export interface RateLimitPolicy {
+  enabled: boolean;
+  store: 'memory' | 'redis';
+  key_prefix?: string;
+  failure_mode: 'open' | 'challenge' | 'block';
+  rules: {
+    default: {
+      window_ms: number;
+      max_requests: number;
+      action: AgentGateAction;
+    };
+    suspected_agent: {
+      window_ms: number;
+      max_requests: number;
+      action: AgentGateAction;
+    };
+    honeypot_hit: {
+      window_ms: number;
+      max_requests: number;
+      action: AgentGateAction;
+    };
+    paths?: Record<string, {
+      window_ms: number;
+      max_requests: number;
+      action: AgentGateAction;
+    }>;
+  };
+}
+
+// Session configuration
+export interface SessionPolicy {
+  enabled: boolean;
+  ttl_ms: number;
+  fallback_ttl_ms: number;
+  cookie_name: string;
+  cookie_secure: boolean;
+  cookie_same_site: 'Lax' | 'Strict' | 'None';
+  track_paths: boolean;
+  max_paths: number;
+}
+
+// Dashboard configuration
+export interface DashboardPolicy {
+  enabled: boolean;
+  require_auth: boolean;
+}
+
+// Webhook configuration
+export interface WebhookPolicy {
+  enabled: boolean;
+  targets: Array<{
+    name: string;
+    url: string;
+    events: Array<
+      | 'honeypot_hit'
+      | 'critical_score'
+      | 'blocked'
+      | 'rate_limit_exceeded'
+      | 'session_violation'
+    >;
+    secret?: string;
+    timeout_ms?: number;
+  }>;
+}
+
 export interface AgentPolicy {
   mode: 'log_only' | 'enforce';
   defaults: {
@@ -101,13 +175,18 @@ export interface AgentPolicy {
   >;
   scoring?: Partial<ScoringConfig>;
   honeypots?: string[];
+  privacy?: PrivacyConfig;
+  rate_limit?: RateLimitPolicy;
+  session?: SessionPolicy;
+  dashboard?: DashboardPolicy;
+  webhooks?: WebhookPolicy;
 }
 
 export const DEFAULT_POLICY: AgentPolicy = {
   mode: 'log_only',
   defaults: {
     action: 'allow',
-    expose_debug_headers: true,
+    expose_debug_headers: false,
   },
   approved_agents: [],
   known_ai_agents: [
@@ -120,6 +199,14 @@ export const DEFAULT_POLICY: AgentPolicy = {
   ],
   paths: {},
   honeypots: ['/agent-honeypot', '/bot-trap', '/internal-agent-policy', '/scrape-check'],
+  privacy: {
+    hash_ip: true,
+    log_raw_ip: false,
+  },
+  rate_limit: undefined,
+  session: undefined,
+  dashboard: undefined,
+  webhooks: undefined,
 };
 
 export interface DecisionResult {
@@ -134,6 +221,7 @@ export interface DecisionResult {
 export interface LogEntry {
   timestamp: string;
   ip: string;
+  ipRaw?: string;
   path: string;
   userAgent: string;
   score: number;

@@ -1,4 +1,4 @@
-# AgentGate Policy Configuration
+# AgentGate Policy Configuration - Iteration 2
 # Copy this file to your project root as agent-policy.yaml
 
 # Mode: log_only (observe without blocking) or enforce (apply actions)
@@ -8,6 +8,11 @@ mode: log_only
 defaults:
   action: allow
   expose_debug_headers: true
+
+# Privacy settings
+privacy:
+  hash_ip: true           # Hash IP addresses for logs/sessions
+  log_raw_ip: false       # Don't log raw IPs (GDPR-friendly)
 
 # Approved agents (explicitly allowed)
 approved_agents:
@@ -44,6 +49,67 @@ paths:
     action: allow
   /blog/*:
     action: allow
+
+# Rate limiting configuration
+rate_limit:
+  enabled: true
+  store: memory  # Use "redis" for production (requires @upstash/redis)
+  # key_prefix: "agentgate"  # Optional prefix for Redis keys
+  failure_mode: open  # open | challenge | block
+    # open: allow requests if rate limit store fails (dev-friendly)
+    # challenge: require challenge if store fails (production recommended)
+    # block: block requests if store fails (maximum security)
+  rules:
+    default:
+      window_ms: 60000
+      max_requests: 60
+      action: limited
+    suspected_agent:
+      window_ms: 60000
+      max_requests: 20
+      action: sandbox
+    honeypot_hit:
+      window_ms: 60000
+      max_requests: 1
+      action: block
+    paths:
+      "/pricing/*":
+        window_ms: 60000
+        max_requests: 10
+        action: challenge
+      "/api/*":
+        window_ms: 60000
+        max_requests: 20
+        action: challenge
+
+# Session tracking configuration
+session:
+  enabled: true
+  ttl_ms: 1800000           # 30 minutes for cookie-based sessions
+  fallback_ttl_ms: 600000   # 10 minutes for fingerprint fallback
+  cookie_name: "agentgate_sid"
+  cookie_secure: true       # Set to false for local HTTP development
+  cookie_same_site: "Lax"
+  track_paths: true
+  max_paths: 50
+
+# Dashboard configuration
+dashboard:
+  enabled: true
+  require_auth: true        # Require Bearer token in production
+
+# Webhook notifications
+webhooks:
+  enabled: false            # Set to true to enable
+  # targets:
+  #   - name: "security-alerts"
+  #     url: "${AGENTGATE_WEBHOOK_URL}"
+  #     events:
+  #       - "honeypot_hit"
+  #       - "critical_score"
+  #       - "blocked"
+  #     secret: "${AGENTGATE_WEBHOOK_SECRET}"  # For HMAC signing
+  #     timeout_ms: 3000
 
 # Scoring configuration (overrides defaults)
 scoring:

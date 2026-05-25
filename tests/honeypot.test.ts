@@ -30,7 +30,7 @@ describe('StaticHoneypotGenerator', () => {
 
 describe('DynamicHoneypotGenerator', () => {
   const generator = new DynamicHoneypotGenerator({
-    secret: 'test-secret',
+    secret: 'test-secret-16-chars',
     expiryMs: 3600000,
   });
 
@@ -52,7 +52,7 @@ describe('DynamicHoneypotGenerator', () => {
 
   it('should reject expired tokens', async () => {
     const expiredGenerator = new DynamicHoneypotGenerator({
-      secret: 'test-secret',
+      secret: 'test-secret-16-chars',
       expiryMs: 1,
     });
 

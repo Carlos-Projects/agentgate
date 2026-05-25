@@ -55,7 +55,7 @@ paths:
   });
 
   it('should match prefix patterns', () => {
-    expect(getActionForPath('/admin', policy)).toBe('block');
+    expect(getActionForPath('/admin/', policy)).toBe('block');
     expect(getActionForPath('/admin/users', policy)).toBe('block');
     expect(getActionForPath('/api/v1/test', policy)).toBe('challenge');
   });

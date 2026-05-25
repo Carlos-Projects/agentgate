@@ -2,6 +2,9 @@
  * Session Types
  */
 
+import { AgentGateAction, SignalType } from '../core/types'
+import { AgentSession as StoreAgentSession } from '../store/types'
+
 export interface SessionConfig {
   enabled: boolean
   ttl_ms: number
@@ -21,12 +24,10 @@ export interface SessionUpdateInput {
 }
 
 export interface SessionResult {
-  session: AgentSession
+  session: StoreAgentSession
   cookie?: string
   isNew: boolean
   isFallback: boolean
 }
 
-// Re-export from store types
-export type { AgentSession } from '../store/types'
-export type { AgentGateAction, SignalType } from '../core/types'
+export type { StoreAgentSession as AgentSession }

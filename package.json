@@ -1,6 +1,6 @@
 {
   "name": "agentgate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Policy-based firewall and honeypot middleware for AI agents accessing websites",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -24,7 +24,8 @@
     "scraping",
     "crawler",
     "nextjs",
-    "express"
+    "express",
+    "cloudflare"
   ],
   "author": "",
   "license": "MIT",
@@ -35,7 +36,7 @@
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
     "eslint": "^8.55.0",
-    "next": "^16.2.6",
+    "next": "^14.0.0",
     "typescript": "^5.3.0",
     "vitest": "^1.0.0"
   },
@@ -43,6 +44,9 @@
     "@types/cookie-parser": "^1.4.10",
     "express": "^5.2.1",
     "js-yaml": "^4.1.0"
+  },
+  "optionalDependencies": {
+    "@upstash/redis": "^1.0.0"
   },
   "peerDependencies": {
     "next": "^14.0.0"
