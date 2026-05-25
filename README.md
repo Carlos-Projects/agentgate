@@ -2,22 +2,25 @@
 
 **Policy-based firewall and honeypot middleware for AI agents accessing websites**
 
-AgentGate provides a programmable perimeter for controlling how AI agents, crawlers, and automated systems interact with your web content. It detects automated traffic through behavioral fingerprinting, scores risk across 11 signals, enforces policies, and provides observability — without expensive infrastructure.
+AgentGate provides a programmable perimeter for controlling how AI agents, crawlers, and automated systems access your web content. It detects automated traffic, scores risk, enforces policies, and provides observability—all without expensive infrastructure.
 
 ## Features
 
-- **11 detection signals**: known AI agents, behavioral fingerprinting, JS challenges, timing analysis, honeypot traps, robots.txt violations, datacenter ASN detection, and more
-- **Behavioral Fingerprinting Engine**: tracks request patterns, secondary resource loading (CSS/images), API-vs-HTML ordering, timing variance, and JS execution verification via client-side challenges
-- **Policy-driven control**: YAML-based configuration for agent approval, path rules, rate limits, and scoring weights
-- **Risk scoring**: 0-100 score configurable signal weights and graduated thresholds
-- **Graduated responses**: `allow` → `limited` → `challenge` → `sandbox` → `block` + `log_only` mode
-- **Honeypot system**: static and time-limited HMAC-signed URLs; standalone content server with fake admin panels, API docs, database dumps, and secrets files
-- **Token Drain Engine**: serves large content (2MB+ pages), slow-streaming responses, deeply nested JSON, and recursive navigation chains to waste scrapers' LLM tokens
-- **Agent Access Portal**: a `/agent-access` page where legitimate agents can declare their identity and mission
-- **JSONL logging**: portable, queryable audit trail with automatic rotation
-- **Dashboard**: built-in analytics showing request distribution, honeypot hits, score breakdown, and recent events
-- **Framework adapters**: Next.js middleware, Express middleware (Cloudflare Workers adapter planned)
-- **CLI**: standalone honeypot server via `agentgate-server`
+### Core Protection
+- **Multi-signal detection**: Combines user-agent, headers, behavior, and rate limiting
+- **Policy-driven control**: YAML-based configuration for approved/denied missions
+- **Risk scoring**: 0-100 score based on configurable signal weights
+- **Graduated responses**: allow, limited, challenge, sandbox, block
+- **Real rate limiting**: Sliding window with multi-key checking (IP, path, session)
+- **Session tracking**: Behavioral analysis with fingerprint fallback
+
+### Advanced Features
+- **Honeypot system**: Static and dynamic trap URLs for bot detection
+- **Privacy-first**: IP hashing by default (GDPR-friendly)
+- **Webhook notifications**: Real-time alerts for critical events
+- **JSONL logging**: Portable, queryable audit trail
+- **Dashboard**: Built-in analytics with authentication
+- **Framework adapters**: Next.js, Express, Cloudflare Workers
 
 ## Quick Start
 
@@ -27,34 +30,61 @@ AgentGate provides a programmable perimeter for controlling how AI agents, crawl
 npm install agentgate
 ```
 
-### CLI — Standalone Honeypot Server
+### Basic Setup (Next.js)
 
-```bash
-# Serve honeypot content on port 3000
-npx agentgate-server
+1. Create `agent-policy.yaml` in your project root:
 
-# Enable token drain (waste scraper resources)
-npx agentgate-server --port 8080 --drain
+```yaml
+mode: log_only
 
-# Visit:
-#   Dashboard:    http://localhost:3000/agentgate-dashboard
-#   Honeypot:     http://localhost:3000/admin
-#   Secrets:      http://localhost:3000/.env
-#   API:          http://localhost:3000/api/v2/users
-#   Declaration:  http://localhost:3000/agent-access
+defaults:
+  action: allow
+  expose_debug_headers: true
+
+privacy:
+  hash_ip: true
+  log_raw_ip: false
+
+rate_limit:
+  enabled: true
+  store: memory  # Use "redis" for production
+  failure_mode: open
+  rules:
+    default:
+      window_ms: 60000
+      max_requests: 60
+      action: limited
+
+session:
+  enabled: true
+  ttl_ms: 1800000
+  fallback_ttl_ms: 600000
+  cookie_name: "agentgate_sid"
+  cookie_secure: false  # Set true in production
+  track_paths: true
+  max_paths: 50
+
+dashboard:
+  enabled: true
+  require_auth: true
+
+known_ai_agents:
+  - GPTBot
+  - ClaudeBot
+  - PerplexityBot
 ```
 
-### Next.js Middleware
+2. Add middleware:
 
 ```typescript
 // middleware.ts
-import { createAgentGate, loadPolicy, createJsonlLogger } from 'agentgate';
+import { createAgentGate, loadPolicy, createJsonlLogger } from 'agentgate'
 
-const policy = loadPolicy('./agent-policy.yaml');
+const policy = loadPolicy('./agent-policy.yaml')
 const agentGate = createAgentGate({
   policy,
   logger: createJsonlLogger(),
-});
+})
 
 export async function middleware(request: NextRequest) {
   const result = await agentGate.processRequest({
@@ -62,98 +92,98 @@ export async function middleware(request: NextRequest) {
     path: request.nextUrl.pathname,
     method: request.method,
     userAgent: request.headers.get('user-agent') || '',
-    cookies: Object.fromEntries(request.cookies.getAll().map(c => [c.name, c.value])),
+    cookies: Object.fromEntries(request.cookies),
     headers: Object.fromEntries(request.headers),
-  });
+  })
 
   if (result.action === 'block') {
-    return new NextResponse('Blocked by AgentGate', { status: 403 });
+    return new NextResponse('Blocked', { status: 403 })
   }
+
   if (result.redirectPath) {
-    return NextResponse.redirect(new URL(result.redirectPath, request.url));
+    return NextResponse.redirect(result.redirectPath)
   }
-  return NextResponse.next();
+
+  return NextResponse.next()
 }
 ```
 
-### Express Middleware
+3. Run your Next.js app and visit `/agentgate-dashboard` to see analytics.
 
-```typescript
-import { createAgentGate, loadPolicy, createConsoleLogger } from 'agentgate';
-import { createExpressMiddleware } from 'agentgate';
+## Configuration
 
-const policy = loadPolicy('./agent-policy.yaml');
-const agentGate = createAgentGate({ policy, logger: createConsoleLogger() });
-
-app.use(createExpressMiddleware(
-  async (req) => agentGate.processRequest({
-    ip: req.ip || 'unknown',
-    path: req.path,
-    method: req.method,
-    userAgent: req.headers['user-agent'] || '',
-    cookies: req.cookies || {},
-    headers: req.headers as Record<string, string>,
-  })
-));
-```
-
-### Programmatic Use
-
-```typescript
-import { AgentGate, DEFAULT_POLICY, SessionStore, calculateFingerprintScore } from 'agentgate';
-
-const gate = new AgentGate({ policy: DEFAULT_POLICY });
-
-// Basic detection
-const result = await gate.processRequest({
-  ip: '10.0.0.1',
-  path: '/api/v2/users',
-  method: 'GET',
-  userAgent: 'GPTBot/1.0',
-  cookies: {},
-  headers: { 'user-agent': 'GPTBot/1.0' },
-});
-
-console.log(result.score, result.action, result.signals);
-// → 93, 'block', ['known_ai_user_agent', 'direct_api_access', ...]
-
-// Behavioral fingerprinting
-const store = new SessionStore();
-const session = store.getOrCreate('sess-1', '10.0.0.1', 'GPTBot/1.0');
-recordRequest(session, '/api/v2/users', 'application/json');
-recordRequest(session, '/api/v2/orders', 'application/json');
-
-const fp = calculateFingerprintScore(session);
-console.log(fp.score, fp.signals);
-// → 60, ['direct_api_access', 'no_js_execution', 'no_secondary_resources']
-```
-
-## Policy Configuration
+### Policy Format
 
 See [config/agent-policy.example.yaml](config/agent-policy.example.yaml) for full options.
 
 ```yaml
-mode: enforce  # or 'log_only'
+# Mode: log_only (observe) or enforce (block)
+mode: log_only
 
-approved_agents:
-  - name: Googlebot
-    action: allow
+# Privacy settings (GDPR-friendly)
+privacy:
+  hash_ip: true
+  log_raw_ip: false
 
-paths:
-  /admin/*:
-    action: block
-  /api/*:
-    action: challenge
-  /pricing:
-    action: limited
+# Rate limiting
+rate_limit:
+  enabled: true
+  store: memory  # or "redis" (requires @upstash/redis)
+  failure_mode: open  # open | challenge | block
+  rules:
+    default:
+      window_ms: 60000
+      max_requests: 60
+      action: limited
+    suspected_agent:
+      window_ms: 60000
+      max_requests: 20
+      action: sandbox
+    honeypot_hit:
+      window_ms: 60000
+      max_requests: 1
+      action: block
+    paths:
+      "/api/*":
+        window_ms: 60000
+        max_requests: 20
+        action: challenge
 
+# Session tracking
+session:
+  enabled: true
+  ttl_ms: 1800000           # 30 min for cookie sessions
+  fallback_ttl_ms: 600000   # 10 min for fingerprint fallback
+  cookie_name: "agentgate_sid"
+  cookie_secure: true
+  cookie_same_site: "Lax"
+  track_paths: true
+  max_paths: 50
+
+# Dashboard authentication
+dashboard:
+  enabled: true
+  require_auth: true
+
+# Webhook notifications
+webhooks:
+  enabled: true
+  targets:
+    - name: "security-alerts"
+      url: "${AGENTGATE_WEBHOOK_URL}"
+      events:
+        - "honeypot_hit"
+        - "critical_score"
+        - "blocked"
+      secret: "${AGENTGATE_WEBHOOK_SECRET}"
+      timeout_ms: 3000
+
+# Scoring configuration
 scoring:
   weights:
     known_ai_user_agent: 25
     honeypot_hit: 50
-    no_secondary_resources: 20
-    direct_api_access: 25
-    robotic_timing: 10
+    high_request_rate: 20
   thresholds:
     allow: 0
     limited: 30
@@ -162,136 +192,203 @@ scoring:
     block: 90
 ```
 
-## Detection Signals
+## Actions
 
-All 11 signals are functional:
+| Action | Description |
+|--------|-------------|
+| `allow` | Normal access |
+| `limited` | Access with restrictions/headers |
+| `challenge` | Redirect to declaration page |
+| `sandbox` | Redirect to controlled environment |
+| `block` | Return 403 |
+| `log_only` | Log without interfering |
 
-| Signal | Default Weight | How it triggers |
-|--------|---------------|-----------------|
-| `known_ai_user_agent` | 25 | User-Agent matches known AI agent (GPTBot, ClaudeBot, etc.) |
-| `suspicious_user_agent` | 15 | User-Agent matches suspicious patterns (bot, crawler, curl) |
-| `missing_accept_language` | 10 | No Accept-Language header |
-| `missing_cookies` | 8 | No cookies sent |
-| `high_request_rate` | 20 | More than 60 requests/minute from same IP |
-| `honeypot_hit` | 50 | Path matches a configured honeypot URL |
-| `no_js_execution` | 10 | Client didn't run JS verification |
-| `datacenter_asn` | 15 | User-Agent or Via header suggests datacenter origin |
-| `repeated_path_pattern` | 15 | Sequential path crawling detected |
-| `robots_violation` | 30 | Bot accesses disallowed paths |
-| `policy_mismatch` | 35 | Request path doesn't match policy defaults |
+## Rate Limiting
 
-### Behavioral Fingerprinting (additional)
+AgentGate implements **real sliding window** rate limiting with multi-key checking:
 
-The `SessionStore` + `calculateFingerprintScore()` provides real-time analysis:
+### Multi-Key Strategy
+- `ip:{hash}` - Global IP limit
+- `ip_path:{ip}:{path}` - Per-path limit
+- `session:{id}` - Session-based limit
+- `ua:{hash}` - User-Agent limit
 
-- **No JS execution** (15pts): requests without running the JS challenge
-- **No secondary resources** (20pts): only HTML/API requests, no CSS/images
-- **Direct API access** (25pts): API called without prior HTML page visit
-- **Robotic timing** (10pts): requests at perfectly uniform intervals
-- **Honeypot chain** (15pts): multiple honeypot URLs visited in sequence
-- **Challenge failed** (25pts): JS challenge was served but never completed
+### Storage Options
 
-## Architecture
-
-```
-Request → normalizeRequest() → detectSignals() → calculateScore() → decide()
-                                                                     ↓
-                                                              AgentGate.processRequest()
-                                                                     ↓
-                                                            ┌──────────────────────┐
-                                                            │   DecisionResult      │
-                                                            │  action, score,       │
-                                                            │  signals, headers,    │
-                                                            │  redirectPath         │
-                                                            └──────────────────────┘
-                                                                    ↓
-                                                    ┌───────────────┴───────────────┐
-                                                    ↓                               ↓
-                                            Logger.log()                  Framework Adapter
-                                            (JSONL / Console)             (Next.js / Express)
+**Memory (Development)**
+```yaml
+rate_limit:
+  enabled: true
+  store: memory
 ```
 
-## Honeypot Content Server
+⚠️ **Warning**: Memory store is for development/demo only. Not suitable for production high-traffic.
 
-The standalone server (`agentgate-server`) serves realistic-looking traps:
+**Redis (Production)**
+```yaml
+rate_limit:
+  enabled: true
+  store: redis
 
-| Path | Content |
-|------|---------|
-| `/admin` | Fake admin panel with users, sessions, config keys |
-| `/secrets.env` | Fake environment variables (API keys, DB passwords) |
-| `/.env` | Same fake secrets (common target path) |
-| `/config/credentials.json` | Fake AWS/Stripe credentials |
-| `/internal/docs/api-reference` | Fake API documentation with live endpoints |
-| `/internal/ecosystem` | Fake internal wiki with service URLs |
-| `/api/v2/users` | Fake JSON API returning user records |
-| `/api/v2/internal/config` | Fake internal config endpoint |
-| `/internal/documents/:page` | Up to 2MB generated content per page |
-| `/internal/recursive` | Infinite recursive navigation chain |
-| `/agent-access` | Agent declaration portal |
-| `/agentgate-dashboard` | Live analytics dashboard |
+# Set environment variables:
+# AGENTGATE_REDIS_URL=your-redis-url
+# AGENTGATE_REDIS_TOKEN=your-redis-token
+```
 
-## Token Drain Engine
+Install Redis adapter:
+```bash
+npm install @upstash/redis
+```
 
-When `--drain` is enabled, agents with score ≥ 70 (sandboxed) receive:
+### Failure Modes
 
-- **Massive pages**: content grows with each visit (up to 2MB)
-- **Slow streaming**: 50KB chunks at 100ms intervals
-- **Deeply nested JSON**: 20 levels of nested objects with array data
-- **Recursive navigation**: pages that link to more pages indefinitely
+```yaml
+rate_limit:
+  failure_mode: open  # or "challenge" or "block"
+```
 
-Each drain response costs the scraping agent real LLM tokens (~500K tokens per 2MB page).
+- `open`: Allow requests if store fails (dev-friendly)
+- `challenge`: Require challenge if store fails (production recommended)
+- `block`: Block requests if store fails (maximum security)
+
+**Default**: `open` in development, `challenge` in production
+
+## Session Tracking
+
+AgentGate tracks user sessions to detect behavioral patterns:
+
+### Features
+- **Cookie-based sessions**: 30-minute TTL (configurable)
+- **Fingerprint fallback**: 10-minute TTL for users without cookies
+- **Path tracking**: Detects repeated patterns (e.g., /product/1, /product/2...)
+- **Cumulative scoring**: Builds risk profile over time
+
+### Privacy
+- IP addresses are hashed by default
+- Raw IPs never logged unless `log_raw_ip: true`
+- GDPR-friendly out of the box
+
+## Dashboard
+
+Visit `/agentgate-dashboard` to see:
+- Total requests and suspected agents
+- Score distribution (low/medium/high/critical)
+- Actions taken
+- Top user agents and paths
+- Honeypot hits
+- Recent events
+
+### Authentication
+
+**Development**:
+```bash
+# Access with query param
+/agentgate-dashboard?token=your-token
+```
+
+**Production**:
+```bash
+# Set environment variable
+export AGENTGATE_DASHBOARD_TOKEN=your-secure-token
+
+# Access with Bearer header
+curl -H "Authorization: Bearer your-token" \
+  https://yoursite.com/agentgate-dashboard
+```
+
+If `AGENTGATE_DASHBOARD_TOKEN` is not set, dashboard returns 503 in production.
+
+## Webhooks
+
+Real-time notifications for critical events:
+
+```yaml
+webhooks:
+  enabled: true
+  targets:
+    - name: "slack-security"
+      url: "https://hooks.slack.com/..."
+      events:
+        - "honeypot_hit"
+        - "critical_score"
+        - "blocked"
+      secret: "your-webhook-secret"  # For HMAC-SHA256 signing
+      timeout_ms: 3000
+```
+
+### Events
+- `honeypot_hit`: Bot visited honeypot URL
+- `critical_score`: Score >= 90
+- `blocked`: Request blocked
+- `rate_limit_exceeded`: Rate limit triggered
+- `session_violation`: Session pattern detected
+
+### Security
+Webhooks are signed with HMAC-SHA256 using Web Crypto API (Edge-compatible).
+
+## Framework Adapters
+
+### Next.js
+```typescript
+import { createAgentGate, loadPolicy } from 'agentgate'
+
+const agentGate = createAgentGate({ policy: loadPolicy('./agent-policy.yaml') })
+
+export async function middleware(request: NextRequest) {
+  const result = await agentGate.processRequest(normalizeNextRequest(request))
+  return handleNextMiddleware(request, result)
+}
+```
+
+### Express
+```typescript
+import { createAgentGate, createExpressMiddleware } from 'agentgate'
+
+const agentGate = createAgentGate({ policy })
+
+app.use(createExpressMiddleware(async (req) => {
+  return await agentGate.processRequest(normalizeExpressRequest(req))
+}))
+```
+
+### Cloudflare Workers
+```typescript
+import { handleCloudflareRequest, createAgentGateForCloudflare } from 'agentgate'
+
+export default {
+  async fetch(request: Request, env: CloudflareEnv, ctx: ExecutionContext) {
+    const agentGate = await createAgentGateForCloudflare(env)
+    return handleCloudflareRequest(request, env, ctx, agentGate)
+  }
+}
+```
 
 ## Logger
 
+AgentGate supports multiple loggers:
+
 ```typescript
 // JSONL (production)
-import { createJsonlLogger } from 'agentgate';
-const logger = createJsonlLogger({ filePath: './logs.jsonl' });
+import { createJsonlLogger } from 'agentgate'
+const logger = createJsonlLogger({ filePath: './logs.jsonl' })
 
 // Console (development)
-import { createConsoleLogger } from 'agentgate';
-const logger = createConsoleLogger({ colors: true, verbose: true });
+import { createConsoleLogger } from 'agentgate'
+const logger = createConsoleLogger({ colors: true, verbose: true })
 ```
 
 Log entry format:
 ```json
 {
   "timestamp": "2026-05-25T10:00:00Z",
-  "ip": "192.168.1.1",
+  "ip": "a1b2c3d4...",  // Hashed by default
+  "ipRaw": "192.168.1.1",  // Only if log_raw_ip: true
   "path": "/pricing",
   "userAgent": "GPTBot/1.0",
   "score": 72,
   "action": "sandbox",
-  "signals": ["known_ai_user_agent", "high_request_rate"],
-  "method": "GET",
-  "responseTime": 45
+  "signals": ["known_ai_user_agent", "high_request_rate"]
 }
-```
-
-## Dashboard
-
-Visit `/agentgate-dashboard` on the standalone honeypot server to see:
-
-- Total requests and suspected agents
-- Score distribution
-- Actions taken
-- Top user agents and paths
-- Honeypot hits
-- Available honeypot endpoints
-
-Note: the dashboard is served by the standalone server, not by the middleware adapter.
-
-## SessionStore API
-
-```typescript
-import { SessionStore, recordRequest, calculateFingerprintScore } from 'agentgate';
-
-const store = new SessionStore(); // auto-cleanup enabled
-store.destroy(); // stop cleanup timer and clear sessions
-
-const session = store.getOrCreate('session-id', 'ip', 'user-agent');
-recordRequest(session, '/path', 'text/html');
-const fp = calculateFingerprintScore(session);
 ```
 
 ## Philosophy
@@ -302,27 +399,57 @@ const fp = calculateFingerprintScore(session);
 - **Policy-driven**: Site owners declare what missions they accept
 - **Graduated response**: Not all bots are equal; responses scale with risk
 - **Observability**: Everything is logged for analysis
-- **Human-friendly**: Real users with JS-enabled browsers pass through
+- **Human-friendly**: Real users are never affected
+
+## Production Deployment
+
+### Environment Variables
+
+```bash
+# Redis (optional, for production rate limiting)
+AGENTGATE_REDIS_URL=your-redis-url
+AGENTGATE_REDIS_TOKEN=your-redis-token
+
+# Dashboard authentication
+AGENTGATE_DASHBOARD_TOKEN=your-secure-token
+
+# Webhooks (optional)
+AGENTGATE_WEBHOOK_URL=https://your-webhook-endpoint.com
+AGENTGATE_WEBHOOK_SECRET=your-signing-secret
+```
+
+### Recommendations
+
+1. **Start in `log_only` mode** for 1-2 weeks
+2. **Review dashboard** to understand traffic patterns
+3. **Enable Redis** for production rate limiting
+4. **Set `cookie_secure: true`** in production
+5. **Disable debug headers** in production
+6. **Configure webhooks** for security alerts
+7. **Use `failure_mode: challenge`** in production
 
 ## Roadmap
 
-- [x] Next.js adapter
-- [x] Express adapter
-- [x] Behavioral fingerprinting engine
-- [x] JS challenge verification
-- [x] Agent access portal
-- [x] Standalone honeypot server
-- [x] Token drain engine
-- [x] Built-in rate limiting
-- [x] All 11 detection signals implemented
-- [ ] Cloudflare Workers adapter
-- [ ] Redis-backed rate limiting
-- [ ] Dashboard authentication
+### Phase 2 (Current) ✅
+- [x] Real rate limiting (sliding window)
+- [x] Session tracking
+- [x] Dashboard authentication
+- [x] Cloudflare Workers adapter
+- [x] Webhook notifications
+- [x] Privacy-first logging
 
-## Related Projects
+### Phase 3 (Future)
+- [ ] IP reputation provider interface
+- [ ] Qwen mission classifier
+- [ ] Canary tokens
+- [ ] CLI tool
+- [ ] SQLite logger adapter
 
-- [palisade-scanner](https://github.com/Carlos-Projects/palisade-scanner) — Scan web content for prompt injection targeting AI agents
-- [MCPGuard](https://github.com/Carlos-Projects/mcpguard) — Runtime security proxy for MCP
+### Not Planned (Yet)
+- SaaS dashboard
+- Billing/monetization
+- ML anomaly detection
+- Browser fingerprinting
 
 ## License
 

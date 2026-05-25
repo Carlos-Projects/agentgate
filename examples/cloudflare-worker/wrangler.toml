@@ -1,0 +1,72 @@
+name = "agentgate-worker"
+main = "worker.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# AgentGate policy (inline YAML or load from file)
+[vars]
+AGENTGATE_POLICY = """
+mode: log_only
+
+defaults:
+  action: allow
+  expose_debug_headers: true
+
+privacy:
+  hash_ip: true
+  log_raw_ip: false
+
+rate_limit:
+  enabled: true
+  store: memory  # Use "redis" in production
+  failure_mode: open
+  rules:
+    default:
+      window_ms: 60000
+      max_requests: 60
+      action: limited
+    suspected_agent:
+      window_ms: 60000
+      max_requests: 20
+      action: sandbox
+    honeypot_hit:
+      window_ms: 60000
+      max_requests: 1
+      action: block
+
+session:
+  enabled: true
+  ttl_ms: 1800000
+  fallback_ttl_ms: 600000
+  cookie_name: "agentgate_sid"
+  cookie_secure: true
+  cookie_same_site: "Lax"
+  track_paths: true
+  max_paths: 50
+
+dashboard:
+  enabled: true
+  require_auth: true
+
+known_ai_agents:
+  - GPTBot
+  - ClaudeBot
+  - PerplexityBot
+  - CCBot
+
+honeypots:
+  - /agent-honeypot
+  - /bot-trap
+  - /internal-agent-policy
+"""
+
+# Secrets to configure (use wrangler secret put):
+# - AGENTGATE_DASHBOARD_TOKEN
+# - AGENTGATE_REDIS_URL (optional, for Redis rate limiting)
+# - AGENTGATE_REDIS_TOKEN (optional)
+# - AGENTGATE_WEBHOOK_URL (optional)
+
+# Optional: KV namespace for logging (future feature)
+# [[kv_namespaces]]
+# binding = "AGENTGATE_KV"
+# id = "your-kv-namespace-id"
