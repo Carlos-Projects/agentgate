@@ -1,10 +1,9 @@
 /**
  * Express Adapter
- * Integrates AgentGate with Express middleware
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { AdapterRequest, AdapterResponse, DecisionResult } from '../core/types';
+import { AdapterRequest, DecisionResult } from '../core/types';
 import { extractClientIP, parseCookies } from '../core/normalize';
 
 export function normalizeExpressRequest(req: Request): AdapterRequest {
@@ -19,32 +18,26 @@ export function normalizeExpressRequest(req: Request): AdapterRequest {
     ip: extractClientIP(headers) || req.ip || 'unknown',
     path: req.path,
     method: req.method,
-    userAgent: req.get('user-agent') || '',
-    referer: req.get('referer'),
-    acceptLanguage: req.get('accept-language'),
+    userAgent: String(req.headers['user-agent'] || ''),
+    referer: req.headers['referer'] as string | undefined,
+    acceptLanguage: req.headers['accept-language'] as string | undefined,
     cookies: req.cookies || {},
     headers,
-    jsExecuted: !!req.cookies['agentgate-js'],
+    jsExecuted: !!req.cookies?.['agentgate-js'],
   };
 }
 
-export function createExpressResponse(
-  result: DecisionResult,
-  res: Response
-): void {
+export function createExpressResponse(result: DecisionResult, res: Response): void {
+  res.setHeader('Content-Type', 'application/json');
+  
   if (result.headers) {
     Object.entries(result.headers).forEach(([key, value]) => {
-      res.set(key, value);
+      if (key !== 'Set-Cookie') res.setHeader(key, value);
     });
   }
 
   if (result.action === 'block') {
-    res.set('X-AgentGate-Blocked', 'true');
-    res.status(403).json({
-      error: 'Access denied',
-      reason: result.reason,
-      score: result.score,
-    });
+    res.status(403).json({ error: 'Access denied', reason: result.reason, score: result.score });
     return;
   }
 
@@ -53,30 +46,22 @@ export function createExpressResponse(
     return;
   }
 
-  if (result.action === 'limited') {
-    res.set('X-AgentGate-Limited', 'true');
-  }
+  res.status(200).json({ action: result.action });
 }
 
-export function createExpressMiddleware(
-  processRequest: (req: Request) => Promise<DecisionResult>
-) {
+export function createExpressMiddleware(processRequest: (req: Request) => Promise<DecisionResult>) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const result = await processRequest(req);
-
       if (result.action === 'block' || result.redirectPath) {
         createExpressResponse(result, res);
         return;
       }
-
-      // Add headers and continue
       if (result.headers) {
         Object.entries(result.headers).forEach(([key, value]) => {
-          res.set(key, value);
+          if (key !== 'Set-Cookie') res.setHeader(key, value);
         });
       }
-
       next();
     } catch (error) {
       console.error('AgentGate middleware error:', error);

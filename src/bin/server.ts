@@ -1,28 +1,13 @@
 #!/usr/bin/env node
-import { HoneypotServer } from '../honeypot/server'
+/**
+ * AgentGate Standalone Server
+ */
 
-const args = process.argv.slice(2)
-const portIdx = args.indexOf('--port')
-const port = portIdx >= 0 ? parseInt(args[portIdx + 1], 10) : 3000
-const drainEnabled = args.includes('--drain')
-const logFileIdx = args.indexOf('--log')
-const logFile = logFileIdx >= 0 ? args[logFileIdx + 1] : undefined
-
-if (args.includes('--help') || args.includes('-h')) {
-  console.log(`
-  AgentGate Honeypot Server
-
-  Usage:
-    agentgate-server [options]
-
-  Options:
-    --port <number>     Port to listen on (default: 3000)
-    --drain             Enable token drain strategies
-    --log <path>        Log file path (default: ./honeypot-logs.jsonl)
-    --help              Show this help
-  `)
-  process.exit(0)
-}
-
-const server = new HoneypotServer({ port, drainEnabled, logFile })
-server.start()
+const port = process.env.PORT || '3000'
+console.log(`AgentGate server starting on port ${port}...`)
+console.log('Configure with Next.js or Express middleware.')
+const server = require('http').createServer((req: any, res: any) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' })
+  res.end('AgentGate server is running. Configure with Next.js or Express middleware.')
+})
+server.listen(port)

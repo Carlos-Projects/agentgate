@@ -74,7 +74,8 @@ export {
 } from './honeypot/drain';
 export type { DrainResult } from './honeypot/drain';
 
-export { HoneypotServer } from './honeypot/server';
+// HoneypotServer temporarily removed (use standalone example instead)
+// export { HoneypotServer } from './honeypot/server';
 
 // Logger
 export { JsonlLogger, createJsonlLogger } from './logger/jsonl';
