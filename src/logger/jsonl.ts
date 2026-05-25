@@ -31,7 +31,11 @@ export class JsonlLogger implements Logger {
     const filePath = this.getFilePath();
 
     try {
-      // Check if rotation is needed
+      const dir = path.dirname(filePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
       if (this.options.rotate && fs.existsSync(filePath)) {
         const stats = fs.statSync(filePath);
         if (stats.size >= this.options.maxFileSize) {
@@ -39,7 +43,6 @@ export class JsonlLogger implements Logger {
         }
       }
 
-      // Append to file
       fs.appendFileSync(filePath, line, 'utf-8');
     } catch (error) {
       console.error('Failed to write log:', error);
