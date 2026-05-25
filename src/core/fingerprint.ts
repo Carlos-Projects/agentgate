@@ -272,7 +272,20 @@ export function generateJsChallenge(): string {
 export function parseFingerprintCookie(cookieValue: string): FingerprintData | null {
   try {
     const decoded = atob(cookieValue)
-    return JSON.parse(decoded) as FingerprintData
+    const raw = JSON.parse(decoded) as Record<string, unknown>
+    // Map short browser API keys to our interface
+    return {
+      jsExecuted: raw.js === true,
+      screenWidth: raw.sw as number | undefined,
+      screenHeight: raw.sh as number | undefined,
+      colorDepth: raw.cd as number | undefined,
+      timezone: raw.tz as string | undefined,
+      cookiesEnabled: raw.ce as boolean | undefined,
+      webdriver: raw.wd as boolean | undefined,
+      languages: raw.langs as string[] | undefined,
+      touchSupport: raw.touch as boolean | undefined,
+      canvasFingerprint: raw.cf as string | undefined,
+    }
   } catch {
     return null
   }
