@@ -1,0 +1,257 @@
+/**
+ * Honeypot Standalone Server
+ * Express-based server that serves honeypot content and applies
+ * AgentGate detection and token drain strategies.
+ */
+
+import express from 'express'
+import { AgentGate, loadPolicyFromString } from '../index'
+import { HONEYPOT_PAGES, HONEYPOT_API_ENDPOINTS, generateInfiniteContent, generateRecursiveLinks } from './content'
+import { LargePageDrain, SlowStreamDrain, RecursiveNavigationDrain } from './drain'
+import { JsonlLogger, createJsonlLogger } from '../logger/jsonl'
+
+export interface HoneypotServerOptions {
+  port: number
+  policyYaml?: string
+  logFile?: string
+  drainEnabled?: boolean
+}
+
+const DEFAULT_POLICY_YAML = `
+mode: enforce
+defaults:
+  action: allow
+  expose_debug_headers: true
+known_ai_agents:
+  - GPTBot
+  - ClaudeBot
+  - PerplexityBot
+  - CCBot
+  - Applebot-Extended
+  - Google-Extended
+  - anthropic-ai
+  - cohere-ai
+  - Bytespider
+honeypots:
+  - /agent-honeypot
+  - /admin
+  - /internal
+  - /secrets.env
+  - /.env
+  - /config
+  - /api/v2
+`
+
+const visitCounts = new Map<string, number>()
+
+export class HoneypotServer {
+  private app: express.Application
+  private agentGate: AgentGate
+  private logger: JsonlLogger
+  private options: HoneypotServerOptions
+  private largePageDrain = new LargePageDrain()
+  private slowDrain = new SlowStreamDrain()
+  private recursiveDrain = new RecursiveNavigationDrain()
+
+  constructor(options: HoneypotServerOptions) {
+    this.options = options
+    this.app = express()
+    this.logger = createJsonlLogger({ filePath: options.logFile || './honeypot-logs.jsonl' })
+    this.agentGate = new AgentGate({
+      policy: loadPolicyFromString(options.policyYaml || DEFAULT_POLICY_YAML),
+      logger: this.logger,
+    })
+    this.setupRoutes()
+  }
+
+  private setupRoutes() {
+    // Serve all honeypot pages
+    for (const page of HONEYPOT_PAGES) {
+      this.app.get(page.path, async (req, res) => this.handleRequest(req, res, () => {
+        const ip = req.ip || 'unknown'
+        const visitNum = (visitCounts.get(ip) || 0) + 1
+        visitCounts.set(ip, visitNum)
+        const content = page.generate(visitNum)
+        res.type(page.contentType).send(content)
+      }))
+    }
+
+    // Serve honeypot API endpoints
+    for (const endpoint of HONEYPOT_API_ENDPOINTS) {
+      const method = endpoint.method.toLowerCase() as 'get' | 'post'
+      this.app[method](endpoint.path, async (req, res) => this.handleRequest(req, res, () => {
+        const content = endpoint.generate()
+        res.type(endpoint.contentType).send(content)
+      }))
+    }
+
+    // Recursive document chain
+    this.app.get('/internal/recursive', async (req, res) => this.handleRequest(req, res, () => {
+      const depth = parseInt(req.query.depth as string) || 0
+      const result = this.recursiveDrain.generate(depth, 10)
+      if (this.options.drainEnabled) {
+        setTimeout(() => res.type(result.contentType).send(result.body), result.delayMs)
+      } else {
+        res.type(result.contentType).send(result.body)
+      }
+    }))
+
+    // Infinite document (token drain)
+    this.app.get('/internal/documents/:page', async (req, res) => this.handleRequest(req, res, () => {
+      const size = Math.min(parseInt(req.query.size as string) || 100_000, 2_000_000)
+      const content = generateInfiniteContent(size)
+      if (this.options.drainEnabled) {
+        // Stream slowly — 50KB chunks with 100ms delay
+        const chunks = Math.ceil(content.length / 50000)
+        res.type('text/html')
+        for (let i = 0; i < chunks; i++) {
+          const chunk = content.slice(i * 50000, (i + 1) * 50000)
+          res.write(chunk)
+          if (this.options.drainEnabled) {
+            const { setTimeout: sleep } = require('timers/promises')
+            // Can't easily do async write loops in Express, just send all at once
+          }
+        }
+        res.end()
+      } else {
+        res.type('text/html').send(content)
+      }
+    }))
+
+    // Dashboard
+    this.app.get('/agentgate-dashboard', async (req, res) => {
+      res.type('text/html').send(this.renderDashboard())
+    })
+
+    // Health
+    this.app.get('/health', (_, res) => {
+      res.json({ status: 'ok', pages_count: HONEYPOT_PAGES.length, api_count: HONEYPOT_API_ENDPOINTS.length })
+    })
+  }
+
+  private async handleRequest(
+    req: express.Request,
+    res: express.Response,
+    handler: () => void
+  ) {
+    const result = await this.agentGate.processRequest({
+      ip: req.ip || 'unknown',
+      path: req.path,
+      method: req.method,
+      userAgent: req.headers['user-agent'] || '',
+      referer: req.headers['referer'],
+      acceptLanguage: req.headers['accept-language'],
+      cookies: (req.cookies as Record<string, string>) || {},
+      headers: req.headers as Record<string, string>,
+    })
+
+    // Add debug headers
+    if (result.headers) {
+      for (const [key, value] of Object.entries(result.headers)) {
+        res.setHeader(key, value)
+      }
+    }
+
+    if (result.action === 'block') {
+      res.status(403).json({
+        error: 'Access denied by AgentGate',
+        score: result.score,
+        reason: result.reason,
+      })
+      return
+    }
+
+    if (result.action === 'sandbox' && this.options.drainEnabled) {
+      // Apply token drain for sandboxed agents
+      const drainStrategy = [this.largePageDrain, this.slowDrain, this.recursiveDrain][Math.floor(Math.random() * 3)]
+      let drainResult
+      if (drainStrategy instanceof LargePageDrain) {
+        drainResult = drainStrategy.generate(Math.floor(Math.random() * 10) + 1)
+      } else if (drainStrategy instanceof SlowStreamDrain) {
+        drainResult = drainStrategy.generate()
+      } else {
+        drainResult = drainStrategy.generate(0, 5)
+      }
+
+      setTimeout(() => {
+        res.type(drainResult.contentType).send(drainResult.body)
+      }, drainResult.delayMs)
+      return
+    }
+
+    handler()
+  }
+
+  private renderDashboard(): string {
+    return `<!DOCTYPE html>
+<html lang="en"><head><title>AgentGate — Honeypot Dashboard</title>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui;background:#0d1117;color:#e1e4e8;padding:2rem;max-width:1200px;margin:auto}
+h1{font-size:1.8rem;background:linear-gradient(135deg,#58a6ff,#bc8cff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:.25rem}
+.subtitle{color:#8b949e;margin-bottom:2rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:2rem}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1.5rem;margin-bottom:1rem}
+.card .value{font-size:2rem;font-weight:700;color:#58a6ff}
+.card .label{color:#8b949e;font-size:.85rem;margin-top:.25rem}
+table{width:100%;border-collapse:collapse}
+td,th{padding:.5rem;text-align:left;border-bottom:1px solid #30363d;font-size:.9rem}
+th{color:#8b949e;font-weight:600}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600}
+.badge-allow{background:#238636;color:#fff}.badge-block{background:#da3633;color:#fff}
+.badge-challenge{background:#d29922;color:#000}.badge-sandbox{background:#1f6feb;color:#fff}
+.endpoints{margin-top:2rem}
+.endpoint{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:.75rem 1rem;margin-bottom:.5rem;display:flex;align-items:center;gap:1rem}
+.method{display:inline-block;padding:2px 8px;border-radius:4px;font-weight:700;font-size:.8rem;min-width:45px;text-align:center}
+.get{background:#238636;color:#fff}.post{background:#1f6feb;color:#fff}
+.path{font-family:monospace;color:#e1e4e8}
+.type{color:#8b949e;font-size:.85rem;margin-left:auto}
+</style></head><body>
+<h1>🛡️ AgentGate Honeypot</h1>
+<p class="subtitle">Active honeypot server · ${HONEYPOT_PAGES.length} pages · ${HONEYPOT_API_ENDPOINTS.length} API endpoints · Drain: ${this.options.drainEnabled ? '✅' : '❌'}</p>
+
+<div class="grid">
+  <div class="card"><div class="value">${HONEYPOT_PAGES.length + 5}</div><div class="label">Total Endpoints</div></div>
+  <div class="card"><div class="value">${HONEYPOT_API_ENDPOINTS.length}</div><div class="label">API Endpoints</div></div>
+  <div class="card"><div class="value">${visitCounts.size}</div><div class="label">Unique Visitors</div></div>
+  <div class="card"><div class="value">${Array.from(visitCounts.values()).reduce((a, b) => a + b, 0)}</div><div class="label">Total Requests</div></div>
+</div>
+
+<div class="card">
+<h2 style="margin-bottom:1rem">📋 Honeypot Pages</h2>
+<table>
+<tr><th>Path</th><th>Type</th><th>Description</th></tr>
+${HONEYPOT_PAGES.map(p => `<tr><td><code>${p.path}</code></td><td>${p.contentType}</td><td>${p.title}</td></tr>`).join('\n')}
+<tr><td><code>/internal/documents/:page</code></td><td>text/html</td><td>Infinite Document Pages (up to 2MB)</td></tr>
+<tr><td><code>/internal/recursive</code></td><td>text/html</td><td>Recursive Navigation Chain</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h2 style="margin-bottom:1rem">🔌 API Endpoints</h2>
+${HONEYPOT_API_ENDPOINTS.map(e => `
+<div class="endpoint">
+  <span class="method ${e.method === 'GET' ? 'get' : 'post'}">${e.method}</span>
+  <span class="path">${e.path}</span>
+  <span class="type">${e.contentType}</span>
+</div>`).join('\n')}
+</div>
+
+<footer style="text-align:center;color:#484f58;font-size:.85rem;margin-top:2rem">
+AgentGate v0.1.0 · ${new Date().toISOString()}
+</footer>
+</body></html>`
+  }
+
+  start(): void {
+    this.app.listen(this.options.port, () => {
+      console.log(`\n  🛡️  AgentGate Honeypot Server`)
+      console.log(`  ─────────────────────────────`)
+      console.log(`  Dashboard: http://localhost:${this.options.port}/agentgate-dashboard`)
+      console.log(`  Health:    http://localhost:${this.options.port}/health`)
+      console.log(`  Pages:     ${HONEYPOT_PAGES.length} honeypot + ${HONEYPOT_API_ENDPOINTS.length} API`)
+      console.log(`  Drain:     ${this.options.drainEnabled ? 'enabled' : 'disabled'}`)
+      console.log(`  Logs:      ${this.options.logFile || './honeypot-logs.jsonl'}\n`)
+    })
+  }
+}

@@ -56,6 +56,22 @@ export {
 } from './honeypot/dynamic';
 export type { DynamicHoneypotOptions } from './honeypot/dynamic';
 
+export {
+  HONEYPOT_PAGES,
+  HONEYPOT_API_ENDPOINTS,
+  generateInfiniteContent,
+  generateRecursiveLinks,
+} from './honeypot/content';
+
+export {
+  LargePageDrain,
+  SlowStreamDrain,
+  RecursiveNavigationDrain,
+} from './honeypot/drain';
+export type { DrainResult } from './honeypot/drain';
+
+export { HoneypotServer } from './honeypot/server';
+
 // Logger
 export { JsonlLogger, createJsonlLogger } from './logger/jsonl';
 export type { JsonlLoggerOptions } from './logger/jsonl';

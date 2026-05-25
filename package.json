@@ -9,7 +9,11 @@
     "dev": "tsc --watch",
     "test": "vitest",
     "lint": "eslint src/**/*.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "server": "node dist/bin/server.js"
+  },
+  "bin": {
+    "agentgate-server": "./dist/bin/server.js"
   },
   "keywords": [
     "ai",
@@ -36,6 +40,8 @@
     "vitest": "^1.0.0"
   },
   "dependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "express": "^5.2.1",
     "js-yaml": "^4.1.0"
   },
   "peerDependencies": {

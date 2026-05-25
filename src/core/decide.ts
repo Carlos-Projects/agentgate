@@ -9,6 +9,7 @@ import {
   Signal,
   SignalType,
   ScoringConfig,
+  AgentGateAction,
 } from './types';
 import { calculateScore, getActionFromScore, getSignalTypes } from './score';
 import { getActionForPath, getActionForAgent, getScoringConfig } from './policy';
@@ -27,7 +28,7 @@ export function decide(
 
   // Priority: agent > path > score-based
   // Agent-specific rules are most specific, then path rules, then score
-  let finalAction = baseAction;
+  let finalAction: AgentGateAction = baseAction;
   let reason = `Score-based: ${score}`;
 
   if (pathAction) {
