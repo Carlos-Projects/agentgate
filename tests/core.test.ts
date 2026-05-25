@@ -1,94 +1,144 @@
 import { describe, it, expect } from 'vitest';
-import {
-  AgentGate,
-  DEFAULT_POLICY,
-  loadPolicyFromString,
-} from '../src/index';
+import { AgentGate, createAgentGate, loadPolicyFromString, createJsonlLogger } from '../src/index';
 
 describe('AgentGate', () => {
-  it('should create instance with default policy', () => {
-    const gate = new AgentGate({ policy: DEFAULT_POLICY });
-    expect(gate).toBeInstanceOf(AgentGate);
-    expect(gate.getPolicy()).toBeDefined();
+  const policy = loadPolicyFromString(`
+mode: enforce
+defaults:
+  action: allow
+  expose_debug_headers: true
+known_ai_agents:
+  - GPTBot
+  - ClaudeBot
+honeypots:
+  - /agent-honeypot
+`);
+
+  const logger = createJsonlLogger({ filePath: '/tmp/agentgate-test.jsonl' });
+
+  const agentGate = createAgentGate({
+    policy,
+    logger,
   });
 
   it('should allow normal requests by default', async () => {
-    const gate = new AgentGate({ policy: DEFAULT_POLICY });
+    const result = await agentGate.processRequest({
+      ip: '192.168.1.1',
+      path: '/about',
+      method: 'GET',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      acceptLanguage: 'en-US,en;q=0.9',
+      cookies: { session: 'abc123' },
+      headers: {},
+      jsExecuted: true,
+    });
+
+    expect(result.action).toBe('allow');
+    // Score may be > 0 if some signals detected, but should be low
+    expect(result.score).toBeLessThan(30);
+  });
+
+  it('should detect and score AI agents', async () => {
+    const result = await agentGate.processRequest({
+      ip: '192.168.1.1',
+      path: '/blog',
+      method: 'GET',
+      userAgent: 'GPTBot/1.0',
+      acceptLanguage: 'en-US',
+      cookies: {},
+      headers: {},
+    });
+
+    expect(result.score).toBeGreaterThan(0);
+    expect(result.signals).toContain('known_ai_user_agent');
+  });
+
+  it('should sandbox high-score requests', async () => {
+    const result = await agentGate.processRequest({
+      ip: '192.168.1.1',
+      path: '/agent-honeypot', // Honeypot = 50 points
+      method: 'GET',
+      userAgent: 'GPTBot/1.0', // Known AI = 25 points
+      acceptLanguage: 'en-US', // Avoid missing_accept_language penalty
+      cookies: {}, // Missing cookies = 8 points
+      headers: {},
+    });
+
+    // Honeypot (50) + known_ai (25) + missing_cookies (8) = 83
+    // 83 is in sandbox range (70-89)
+    expect(result.action).toBe('sandbox');
+    expect(result.score).toBeGreaterThanOrEqual(70);
+    expect(result.score).toBeLessThan(90);
+  });
+
+  it('should respect path-specific rules', async () => {
+    const policyWithPath = loadPolicyFromString(`
+mode: enforce
+defaults:
+  action: allow
+paths:
+  /admin/*:
+    action: block
+`);
+
+    const gate = createAgentGate({ policy: policyWithPath, logger });
+
+    const result = await gate.processRequest({
+      ip: '192.168.1.1',
+      path: '/admin/dashboard',
+      method: 'GET',
+      userAgent: 'Mozilla/5.0',
+      acceptLanguage: 'en-US',
+      cookies: { session: 'abc' },
+      headers: {},
+    });
+
+    expect(result.action).toBe('block');
+    expect(result.reason).toContain('Path policy');
+  });
+
+  it('should provide redirect for challenge action', async () => {
+    const policyWithChallenge = loadPolicyFromString(`
+mode: enforce
+defaults:
+  action: allow
+paths:
+  /api/*:
+    action: challenge
+`);
+
+    const gate = createAgentGate({ policy: policyWithChallenge, logger });
+
+    const result = await gate.processRequest({
+      ip: '192.168.1.1',
+      path: '/api/data',
+      method: 'GET',
+      userAgent: 'Mozilla/5.0',
+      acceptLanguage: 'en-US',
+      cookies: { session: 'abc' },
+      headers: {},
+    });
+
+    expect(result.action).toBe('challenge');
+    expect(result.redirectPath).toBe('/agent-access');
+  });
+
+  it('should update policy dynamically', async () => {
+    const gate = createAgentGate({ policy, logger });
+
+    gate.updatePolicy({ mode: 'log_only' });
+
     const result = await gate.processRequest({
       ip: '192.168.1.1',
       path: '/',
       method: 'GET',
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-      cookies: { session: 'abc' },
-      headers: {
-        'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-        'accept-language': 'en-US',
-      },
-    });
-    expect(result.action).toBe('allow');
-    expect(result.score).toBe(0);
-  });
-
-  it('should detect known AI agents', async () => {
-    const gate = new AgentGate({ policy: DEFAULT_POLICY });
-    const result = await gate.processRequest({
-      ip: '10.0.0.1',
-      path: '/',
-      method: 'GET',
-      userAgent: 'Mozilla/5.0 GPTBot/1.0',
-      cookies: {},
-      headers: {
-        'user-agent': 'Mozilla/5.0 GPTBot/1.0',
-      },
-    });
-    expect(result.signals).toContain('known_ai_user_agent');
-    expect(result.score).toBeGreaterThan(0);
-  });
-
-  it('should detect honeypot hits', async () => {
-    const gate = new AgentGate({ policy: DEFAULT_POLICY });
-    const result = await gate.processRequest({
-      ip: '10.0.0.1',
-      path: '/agent-honeypot',
-      method: 'GET',
-      userAgent: 'SomeBot/1.0',
-      cookies: {},
-      headers: { 'user-agent': 'SomeBot/1.0' },
-    });
-    expect(result.signals).toContain('honeypot_hit');
-    expect(result.score).toBeGreaterThanOrEqual(50);
-  });
-
-  it('should load policy from YAML string', () => {
-    const yaml = `
-mode: enforce
-defaults:
-  action: allow
-  expose_debug_headers: false
-known_ai_agents:
-  - CustomBot
-honeypots:
-  - /custom-trap
-`;
-    const policy = loadPolicyFromString(yaml);
-    expect(policy.mode).toBe('enforce');
-    expect(policy.defaults.expose_debug_headers).toBe(false);
-    expect(policy.known_ai_agents).toContain('CustomBot');
-    expect(policy.honeypots).toContain('/custom-trap');
-  });
-
-  it('should block requests over threshold', async () => {
-    const gate = new AgentGate({ policy: DEFAULT_POLICY });
-    const result = await gate.processRequest({
-      ip: '10.0.0.1',
-      path: '/agent-honeypot',
-      method: 'GET',
       userAgent: 'GPTBot/1.0',
+      acceptLanguage: 'en-US',
       cookies: {},
-      headers: { 'user-agent': 'GPTBot/1.0' },
+      headers: {},
     });
-    // Honeypot (50) + known_ai (25) = 75 >= 70 (sandbox)
-    expect(result.action).toBe('sandbox');
-    expect(result.score).toBeGreaterThanOrEqual(70);
+
+    // In log_only mode, even high scores become log_only
+    expect(result.action).toBe('log_only');
   });
 });

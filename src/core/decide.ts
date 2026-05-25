@@ -6,7 +6,6 @@
 import {
   DecisionResult,
   AgentPolicy,
-  AgentGateAction,
   Signal,
   SignalType,
   ScoringConfig,
@@ -26,21 +25,24 @@ export function decide(
   const pathAction = getActionForPath(path, policy);
   const agentAction = getActionForAgent(userAgent, policy);
 
-  // Priority: path > agent > score-based
-  let finalAction: AgentGateAction = baseAction;
+  // Priority: agent > path > score-based
+  // Agent-specific rules are most specific, then path rules, then score
+  let finalAction = baseAction;
   let reason = `Score-based: ${score}`;
 
   if (pathAction) {
     finalAction = pathAction;
     reason = `Path policy: ${path}`;
-  } else if (agentAction) {
+  }
+  
+  if (agentAction) {
     finalAction = agentAction;
     reason = `Agent policy: ${userAgent}`;
   }
 
   // Enforce mode check
   if (policy.mode === 'log_only' && finalAction !== 'allow') {
-    finalAction = 'log_only' as AgentGateAction;
+    finalAction = 'log_only';
     reason = `Log-only mode: ${reason}`;
   }
 

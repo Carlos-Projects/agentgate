@@ -107,7 +107,9 @@ approved_agents:
     expect(result.reason).toContain('Path policy');
   });
 
-  it('should respect agent-specific rules', () => {
+  it('should respect agent-specific rules over path rules', () => {
+    // Googlebot is approved, so even though /api/* has challenge action,
+    // the agent rule should take priority
     const signals = detectSignals(normalizeRequest({
       ip: '192.168.1.1',
       path: '/api/data',
@@ -120,7 +122,8 @@ approved_agents:
 
     const result = decide(25, signals, '/api/data', 'Googlebot/2.1', policy);
 
-    expect(result.action).toBe('allow'); // Approved agent overrides path rule
+    // Agent rule should override path rule
+    expect(result.action).toBe('allow');
     expect(result.reason).toContain('Agent policy');
   });
 
