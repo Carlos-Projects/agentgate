@@ -5,10 +5,17 @@
 
 import { RequestContext, Signal, SignalType, AgentPolicy } from './types';
 
-// In-memory rate tracking per IP
+// In-memory rate tracking per IP with periodic cleanup
+const RATE_WINDOW_MS = 60_000
+const RATE_LIMIT = 60
 const rateBuckets = new Map<string, { count: number; windowStart: number }>()
-const RATE_WINDOW_MS = 60_000 // 1 minute
-const RATE_LIMIT = 60 // requests per minute
+const RATE_CLEANUP_INTERVAL = setInterval(() => {
+  const cutoff = Date.now() - RATE_WINDOW_MS
+  for (const [ip, bucket] of rateBuckets) {
+    if (bucket.windowStart < cutoff) rateBuckets.delete(ip)
+  }
+}, 5 * 60_000)
+RATE_CLEANUP_INTERVAL.unref?.()
 
 const KNOWN_AI_AGENTS_DEFAULT = [
   'GPTBot',

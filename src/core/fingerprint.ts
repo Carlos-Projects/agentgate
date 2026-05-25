@@ -310,6 +310,7 @@ export function parseFingerprintCookie(cookieValue: string): FingerprintData | n
 }
 
 export function generateChallengePage(redirectTo: string): string {
+  const safeUrl = redirectTo.replace(/'/g, '').replace(/"/g, '')
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8">
@@ -337,7 +338,7 @@ p{color:#8b949e;margin-bottom:1.5rem;line-height:1.6}
   <p style="color:#238636;font-size:1.2rem">✓ Verified</p>
   <p style="color:#8b949e">You are a real browser. Redirecting...</p>
 </div>
-<button class="redirect-btn" id="redirectBtn" onclick="window.location.href='${redirectTo}'">Continue →</button>
+<button class="redirect-btn" id="redirectBtn" onclick="window.location.href='${safeUrl}'">Continue →</button>
 </div>
 <script>${generateJsChallenge()}
 // Wait for cookie and redirect

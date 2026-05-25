@@ -5,7 +5,7 @@
  */
 
 import express from 'express'
-import { AgentGate, loadPolicyFromString, SessionStore } from '../index'
+import { AgentGate, loadPolicyFromString, SessionStore, generateAgentAccessPage } from '../index'
 import { HONEYPOT_PAGES, HONEYPOT_API_ENDPOINTS, generateInfiniteContent, generateRecursiveLinks } from './content'
 import { LargePageDrain, SlowStreamDrain, RecursiveNavigationDrain } from './drain'
 import { JsonlLogger, createJsonlLogger } from '../logger/jsonl'
@@ -45,9 +45,17 @@ honeypots:
 class VisitTracker {
   private visits = new Map<string, { count: number; lastVisit: number }>()
   private ttl: number
+  private cleanupInterval: ReturnType<typeof setInterval>
 
   constructor(ttlMs: number = 24 * 60 * 60 * 1000) {
     this.ttl = ttlMs
+    this.cleanupInterval = setInterval(() => this.cleanup(), 30 * 60 * 1000)
+    this.cleanupInterval.unref?.()
+  }
+
+  destroy(): void {
+    clearInterval(this.cleanupInterval)
+    this.visits.clear()
   }
 
   increment(ip: string): number {
@@ -66,15 +74,8 @@ class VisitTracker {
     return this.visits.get(ip)?.count ?? 0
   }
 
-  get totalVisitors(): number {
-    this.cleanup()
-    return this.visits.size
-  }
-
-  get totalVisits(): number {
-    this.cleanup()
-    return Array.from(this.visits.values()).reduce((sum, v) => sum + v.count, 0)
-  }
+  get totalVisitors(): number { return this.getActiveCount() }
+  get totalVisits(): number { return this.getTotalCount() }
 
   cleanup(): void {
     const now = Date.now()
@@ -83,6 +84,18 @@ class VisitTracker {
         this.visits.delete(ip)
       }
     }
+  }
+
+  /** Cleanup entries older than TTL and return count of active visitors */
+  private getActiveCount(): number {
+    this.cleanup()
+    return this.visits.size
+  }
+
+  /** Sum all visit counts after cleanup */
+  private getTotalCount(): number {
+    this.cleanup()
+    return Array.from(this.visits.values()).reduce((sum, v) => sum + v.count, 0)
   }
 }
 
@@ -145,21 +158,44 @@ export class HoneypotServer {
       const content = generateInfiniteContent(size)
       if (this.options.drainEnabled) {
         const chunks = Math.ceil(content.length / 50000)
+        let aborted = false
+        req.on('close', () => { aborted = true })
         res.type('text/html')
-        for (let i = 0; i < chunks; i++) {
+        for (let i = 0; i < chunks && !aborted; i++) {
           res.write(content.slice(i * 50000, (i + 1) * 50000))
           await new Promise(r => setTimeout(r, 100))
         }
-        res.end()
+        if (!aborted) res.end()
       } else {
         res.type('text/html').send(content)
       }
     }))
 
-    // Dashboard
-    this.app.get('/agentgate-dashboard', async (req, res) => {
-      res.type('text/html').send(this.renderDashboard())
-    })
+    // Agent Access Portal
+    this.app.get('/agent-access', async (req, res) => this.handleRequest(req, res, () => {
+      res.type('text/html').send(generateAgentAccessPage(this.agentGate.getPolicy()))
+    }))
+
+    // Agent Sandbox (dummy page for redirected agents)
+    this.app.get('/agent-sandbox', async (req, res) => this.handleRequest(req, res, () => {
+      res.type('text/html').send(`<!DOCTYPE html>
+<html lang="en"><head><title>Sandbox Environment — AgentGate</title>
+<style>body{font-family:system-ui;background:#0d1117;color:#e1e4e8;padding:2rem;max-width:600px;margin:auto}
+.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:1.5rem;margin-top:2rem}
+h1{color:#1f6feb}a{color:#58a6ff}code{background:#0d1117;padding:2px 6px;border-radius:3px}
+.footer{color:#484f58;font-size:.85rem;margin-top:2rem;text-align:center}</style></head>
+<body><div class="card">
+<h1>🧪 Sandbox Environment</h1>
+<p style="color:#8b949e">You have been redirected to a controlled testing environment.</p>
+<p>This area contains <strong>simulated data</strong> for automated evaluation purposes.
+All content here is synthetic and isolated from production systems.</p>
+<p>To access the real site, please visit <a href="/agent-access">/agent-access</a> to declare your agent.</p>
+<hr style="border-color:#30363d;margin:1rem 0"/>
+<p style="font-size:.9rem">Your requests are being logged for analysis.</p>
+</div>
+<div class="footer">AgentGate v0.1.0 · <a href="/agentgate-dashboard">Dashboard</a></div>
+</body></html>`)
+    }))
 
     // Health
     this.app.get('/health', (_, res) => {

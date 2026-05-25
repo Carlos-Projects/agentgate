@@ -13,7 +13,7 @@ function tmpLogFile(): string {
 describe('JsonlLogger', () => {
   it('should write log entries to file', async () => {
     const logPath = tmpLogFile()
-    const logger = createJsonlLogger({ filePath: logPath, maxSizeBytes: 10_000_000 })
+    const logger = createJsonlLogger({ filePath: logPath, maxFileSize: 10_000_000 })
     await logger.log({
       timestamp: '2026-01-01T00:00:00Z',
       ip: '10.0.0.1',
@@ -37,7 +37,7 @@ describe('JsonlLogger', () => {
 
   it('should read back log entries', async () => {
     const logPath = tmpLogFile()
-    const logger = createJsonlLogger({ filePath: logPath, maxSizeBytes: 10_000_000 })
+    const logger = createJsonlLogger({ filePath: logPath, maxFileSize: 10_000_000 })
     await logger.log({
       timestamp: '2026-01-01T00:00:00Z', ip: '10.0.0.1', path: '/a',
       userAgent: 'A', score: 10, action: 'allow', signals: [],
@@ -56,7 +56,7 @@ describe('JsonlLogger', () => {
 
   it('should handle many entries', async () => {
     const logPath = tmpLogFile()
-    const logger = createJsonlLogger({ filePath: logPath, maxSizeBytes: 10_000_000 })
+    const logger = createJsonlLogger({ filePath: logPath, maxFileSize: 10_000_000 })
     for (let i = 0; i < 100; i++) {
       await logger.log({
         timestamp: new Date().toISOString(), ip: `10.0.0.${i % 10}`, path: '/',

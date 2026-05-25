@@ -26,5 +26,5 @@
     "declarationMap": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "examples", "tests"]
+  "exclude": ["node_modules", "dist", "examples", "tests", "src/rate-limit", "src/session", "src/store", "src/webhooks"]
 }
