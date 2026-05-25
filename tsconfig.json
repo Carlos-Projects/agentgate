@@ -10,6 +10,6 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "include": ["src/core/**/*", "src/store/**/*", "src/rate-limit/**/*", "src/session/**/*", "src/webhooks/**/*", "src/logger/**/*", "src/dashboard/**/*", "src/honeypot/**/*", "src/index.ts"],
-  "exclude": ["node_modules", "dist", "examples", "tests", "src/adapters", "src/bin"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "tests", "src/adapters", "src/bin"]
 }
