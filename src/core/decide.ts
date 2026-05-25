@@ -6,12 +6,10 @@
 import {
   DecisionResult,
   AgentPolicy,
-  Signal,
-  SignalType,
-  ScoringConfig,
   AgentGateAction,
+  Signal,
 } from './types';
-import { calculateScore, getActionFromScore, getSignalTypes } from './score';
+import { getActionFromScore, getSignalTypes } from './score';
 import { getActionForPath, getActionForAgent, getScoringConfig } from './policy';
 
 export function decide(

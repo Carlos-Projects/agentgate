@@ -13,16 +13,23 @@ export interface DynamicHoneypotOptions {
 }
 
 const DEFAULT_OPTIONS: Required<DynamicHoneypotOptions> = {
-  secret: 'agentgate-default-secret-change-in-production',
-  expiryMs: 3600000, // 1 hour
+  secret: 'change-me-in-production',
+  expiryMs: 3600000,
   basePath: '/.well-known/agent-trap',
 };
+
+function warnIfDefaultSecret(secret: string): void {
+  if (secret === 'change-me-in-production') {
+    console.warn('[AgentGate] WARNING: Using default HMAC secret for DynamicHoneypotGenerator. Set a custom secret in production.')
+  }
+}
 
 export class DynamicHoneypotGenerator implements HoneypotGenerator {
   private options: Required<DynamicHoneypotOptions>;
 
   constructor(options: DynamicHoneypotOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
+    warnIfDefaultSecret(this.options.secret);
   }
 
   generateUrl(context?: { data?: string }): string {

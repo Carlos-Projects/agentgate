@@ -3,7 +3,7 @@ import { HoneypotServer } from '../honeypot/server'
 
 const args = process.argv.slice(2)
 const portIdx = args.indexOf('--port')
-const port = portIdx >= 0 ? parseInt(args[portIdx + 1]) : 3000
+const port = portIdx >= 0 ? parseInt(args[portIdx + 1], 10) : 3000
 const drainEnabled = args.includes('--drain')
 const logFileIdx = args.indexOf('--log')
 const logFile = logFileIdx >= 0 ? args[logFileIdx + 1] : undefined

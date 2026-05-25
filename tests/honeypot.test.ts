@@ -50,19 +50,17 @@ describe('DynamicHoneypotGenerator', () => {
     expect(generator.validateToken('')).toBe(false);
   });
 
-  it('should reject expired tokens', () => {
+  it('should reject expired tokens', async () => {
     const expiredGenerator = new DynamicHoneypotGenerator({
       secret: 'test-secret',
-      expiryMs: 1, // 1ms expiry
+      expiryMs: 1,
     });
 
     const url = expiredGenerator.generateUrl();
     const token = url.split('/').pop()!;
 
-    // Wait for expiry
-    setTimeout(() => {
-      expect(expiredGenerator.validateToken(token)).toBe(false);
-    }, 10);
+    await new Promise(r => setTimeout(r, 20))
+    expect(expiredGenerator.validateToken(token)).toBe(false);
   });
 
   it('should identify honeypot paths', () => {

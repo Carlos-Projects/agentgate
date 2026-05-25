@@ -5,7 +5,7 @@
  */
 
 import express from 'express'
-import { AgentGate, loadPolicyFromString } from '../index'
+import { AgentGate, loadPolicyFromString, SessionStore } from '../index'
 import { HONEYPOT_PAGES, HONEYPOT_API_ENDPOINTS, generateInfiniteContent, generateRecursiveLinks } from './content'
 import { LargePageDrain, SlowStreamDrain, RecursiveNavigationDrain } from './drain'
 import { JsonlLogger, createJsonlLogger } from '../logger/jsonl'
@@ -42,7 +42,49 @@ honeypots:
   - /api/v2
 `
 
-const visitCounts = new Map<string, number>()
+class VisitTracker {
+  private visits = new Map<string, { count: number; lastVisit: number }>()
+  private ttl: number
+
+  constructor(ttlMs: number = 24 * 60 * 60 * 1000) {
+    this.ttl = ttlMs
+  }
+
+  increment(ip: string): number {
+    const now = Date.now()
+    const entry = this.visits.get(ip)
+    if (!entry || now - entry.lastVisit > this.ttl) {
+      this.visits.set(ip, { count: 1, lastVisit: now })
+      return 1
+    }
+    entry.count++
+    entry.lastVisit = now
+    return entry.count
+  }
+
+  getCount(ip: string): number {
+    return this.visits.get(ip)?.count ?? 0
+  }
+
+  get totalVisitors(): number {
+    this.cleanup()
+    return this.visits.size
+  }
+
+  get totalVisits(): number {
+    this.cleanup()
+    return Array.from(this.visits.values()).reduce((sum, v) => sum + v.count, 0)
+  }
+
+  cleanup(): void {
+    const now = Date.now()
+    for (const [ip, entry] of this.visits) {
+      if (now - entry.lastVisit > this.ttl) {
+        this.visits.delete(ip)
+      }
+    }
+  }
+}
 
 export class HoneypotServer {
   private app: express.Application
@@ -52,6 +94,8 @@ export class HoneypotServer {
   private largePageDrain = new LargePageDrain()
   private slowDrain = new SlowStreamDrain()
   private recursiveDrain = new RecursiveNavigationDrain()
+  private visitTracker = new VisitTracker()
+  private sessionStore = new SessionStore()
 
   constructor(options: HoneypotServerOptions) {
     this.options = options
@@ -69,8 +113,7 @@ export class HoneypotServer {
     for (const page of HONEYPOT_PAGES) {
       this.app.get(page.path, async (req, res) => this.handleRequest(req, res, () => {
         const ip = req.ip || 'unknown'
-        const visitNum = (visitCounts.get(ip) || 0) + 1
-        visitCounts.set(ip, visitNum)
+        const visitNum = this.visitTracker.increment(ip)
         const content = page.generate(visitNum)
         res.type(page.contentType).send(content)
       }))
@@ -97,20 +140,15 @@ export class HoneypotServer {
     }))
 
     // Infinite document (token drain)
-    this.app.get('/internal/documents/:page', async (req, res) => this.handleRequest(req, res, () => {
-      const size = Math.min(parseInt(req.query.size as string) || 100_000, 2_000_000)
+    this.app.get('/internal/documents/:page', async (req, res) => this.handleRequest(req, res, async () => {
+      const size = Math.min(parseInt(req.query.size as string, 10) || 100_000, 2_000_000)
       const content = generateInfiniteContent(size)
       if (this.options.drainEnabled) {
-        // Stream slowly — 50KB chunks with 100ms delay
         const chunks = Math.ceil(content.length / 50000)
         res.type('text/html')
         for (let i = 0; i < chunks; i++) {
-          const chunk = content.slice(i * 50000, (i + 1) * 50000)
-          res.write(chunk)
-          if (this.options.drainEnabled) {
-            const { setTimeout: sleep } = require('timers/promises')
-            // Can't easily do async write loops in Express, just send all at once
-          }
+          res.write(content.slice(i * 50000, (i + 1) * 50000))
+          await new Promise(r => setTimeout(r, 100))
         }
         res.end()
       } else {
@@ -213,8 +251,8 @@ th{color:#8b949e;font-weight:600}
 <div class="grid">
   <div class="card"><div class="value">${HONEYPOT_PAGES.length + 5}</div><div class="label">Total Endpoints</div></div>
   <div class="card"><div class="value">${HONEYPOT_API_ENDPOINTS.length}</div><div class="label">API Endpoints</div></div>
-  <div class="card"><div class="value">${visitCounts.size}</div><div class="label">Unique Visitors</div></div>
-  <div class="card"><div class="value">${Array.from(visitCounts.values()).reduce((a, b) => a + b, 0)}</div><div class="label">Total Requests</div></div>
+  <div class="card"><div class="value">${this.visitTracker.totalVisitors}</div><div class="label">Unique Visitors</div></div>
+  <div class="card"><div class="value">${this.visitTracker.totalVisits}</div><div class="label">Total Requests</div></div>
 </div>
 
 <div class="card">

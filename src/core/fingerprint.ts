@@ -47,42 +47,60 @@ export interface SessionFingerprint {
   score: number // 0-100, fingerprint-only score
 }
 
-const sessions = new Map<string, SessionFingerprint>()
-const SESSION_TTL_MS = 30 * 60 * 1000 // 30 minutes
+const SESSION_TTL_MS = 30 * 60 * 1000
 
-// Clean up old sessions periodically
-setInterval(() => {
-  const now = Date.now()
-  for (const [id, session] of sessions) {
-    if (now - session.lastRequestAt > SESSION_TTL_MS) {
-      sessions.delete(id)
+export class SessionStore {
+  private sessions = new Map<string, SessionFingerprint>()
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null
+
+  constructor(autoCleanup: boolean = true) {
+    if (autoCleanup) {
+      this.cleanupInterval = setInterval(() => this.cleanup(), 5 * 60 * 1000)
+      this.cleanupInterval.unref?.()
     }
   }
-}, 5 * 60 * 1000)
 
-export function getOrCreateSession(sessionId: string, ip: string, userAgent: string): SessionFingerprint {
-  let session = sessions.get(sessionId)
-  if (!session) {
-    session = {
-      sessionId,
-      ip,
-      userAgent,
-      firstRequestAt: Date.now(),
-      lastRequestAt: Date.now(),
-      totalRequests: 0,
-      patterns: [],
-      jsVerified: false,
-      jsCookieSet: false,
-      hasSecondaryResources: false,
-      averageRequestInterval: 0,
-      pathProgression: [],
-      apiWithoutHtml: false,
-      consecutiveTiming: [],
-      score: 0,
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval)
+      this.cleanupInterval = null
     }
-    sessions.set(sessionId, session)
+    this.sessions.clear()
   }
-  return session
+
+  cleanup(): void {
+    const now = Date.now()
+    for (const [id, session] of this.sessions) {
+      if (now - session.lastRequestAt > SESSION_TTL_MS) {
+        this.sessions.delete(id)
+      }
+    }
+  }
+
+  getOrCreate(sessionId: string, ip: string, userAgent: string): SessionFingerprint {
+    let session = this.sessions.get(sessionId)
+    if (!session) {
+      session = {
+        sessionId,
+        ip,
+        userAgent,
+        firstRequestAt: Date.now(),
+        lastRequestAt: Date.now(),
+        totalRequests: 0,
+        patterns: [],
+        jsVerified: false,
+        jsCookieSet: false,
+        hasSecondaryResources: false,
+        averageRequestInterval: 0,
+        pathProgression: [],
+        apiWithoutHtml: false,
+        consecutiveTiming: [],
+        score: 0,
+      }
+      this.sessions.set(sessionId, session)
+    }
+    return session
+  }
 }
 
 export function recordRequest(

@@ -35,8 +35,12 @@ export function generateAccessPolicyDeclaration(agentName: string): string {
 -->`
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
+}
+
 export function generateAgentAccessPage(policy: AgentPolicy): string {
-  const approvedList = policy.approved_agents?.map(a => a.name).join(', ') || 'None configured'
+  const approvedList = policy.approved_agents?.map(a => escapeHtml(a.name)).join(', ') || 'None configured'
 
   return `<!DOCTYPE html>
 <html lang="en">

@@ -33,7 +33,7 @@ export {
 } from './core/policy';
 export { decide } from './core/decide';
 export { normalizeRequest, extractClientIP, parseCookies } from './core/normalize';
-export { getOrCreateSession, recordRequest, setJsVerified, setJsCookieDetected, calculateFingerprintScore, generateJsChallenge, parseFingerprintCookie, generateChallengePage } from './core/fingerprint';
+export { SessionStore, recordRequest, setJsVerified, setJsCookieDetected, calculateFingerprintScore, generateJsChallenge, parseFingerprintCookie, generateChallengePage } from './core/fingerprint';
 export type { FingerprintData, SessionFingerprint, RequestPattern } from './core/fingerprint';
 export { generateAgentAccessPage, generateDeclarationApiResponse } from './core/portal';
 export type { AgentDeclaration } from './core/portal';

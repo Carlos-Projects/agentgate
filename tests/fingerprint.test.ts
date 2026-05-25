@@ -1,6 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
-  getOrCreateSession,
+  SessionStore,
   recordRequest,
   setJsVerified,
   setJsCookieDetected,
@@ -11,18 +11,24 @@ import {
 } from '../src/core/fingerprint'
 
 describe('Fingerprint Engine', () => {
+  let store: SessionStore
+
+  beforeEach(() => {
+    store = new SessionStore(false)
+  })
+
   it('should create and retrieve sessions', () => {
-    const session = getOrCreateSession('test-session-1', '192.168.1.1', 'TestBot/1.0')
+    const session = store.getOrCreate('test-session-1', '192.168.1.1', 'TestBot/1.0')
     expect(session.sessionId).toBe('test-session-1')
     expect(session.totalRequests).toBe(0)
     expect(session.ip).toBe('192.168.1.1')
 
-    const same = getOrCreateSession('test-session-1', '192.168.1.1', 'TestBot/1.0')
+    const same = store.getOrCreate('test-session-1', '192.168.1.1', 'TestBot/1.0')
     expect(same).toBe(session)
   })
 
   it('should track request patterns', () => {
-    const session = getOrCreateSession('test-patterns', '10.0.0.1', 'Mozilla/5.0')
+    const session = store.getOrCreate('test-patterns', '10.0.0.1', 'Mozilla/5.0')
     recordRequest(session, '/', 'text/html')
     recordRequest(session, '/style.css', 'text/css')
     recordRequest(session, '/script.js', 'text/javascript')
@@ -33,13 +39,13 @@ describe('Fingerprint Engine', () => {
   })
 
   it('should detect API without HTML', () => {
-    const session = getOrCreateSession('test-api', '10.0.0.1', 'ScraperBot/1.0')
+    const session = store.getOrCreate('test-api', '10.0.0.1', 'ScraperBot/1.0')
     recordRequest(session, '/api/v2/users', 'application/json')
     expect(session.apiWithoutHtml).toBe(true)
   })
 
   it('should calculate high score for no JS + API-only', () => {
-    const session = getOrCreateSession('test-score', '10.0.0.1', 'ScraperBot/1.0')
+    const session = store.getOrCreate('test-score', '10.0.0.1', 'ScraperBot/1.0')
     recordRequest(session, '/api/v2/users', 'application/json')
     recordRequest(session, '/api/v2/orders', 'application/json')
     recordRequest(session, '/api/v2/internal/config', 'application/json')
@@ -50,15 +56,13 @@ describe('Fingerprint Engine', () => {
   })
 
   it('should detect JS verification', () => {
-    const session = getOrCreateSession('test-js', '10.0.0.1', 'Mozilla/5.0')
+    const session = store.getOrCreate('test-js', '10.0.0.1', 'Mozilla/5.0')
     recordRequest(session, '/', 'text/html')
     recordRequest(session, '/style.css', 'text/css')
 
-    // Before verification
     const before = calculateFingerprintScore(session)
     expect(before.score).toBeGreaterThan(0)
 
-    // After verification
     setJsVerified(session)
     setJsCookieDetected(session)
     const after = calculateFingerprintScore(session)
@@ -91,8 +95,7 @@ describe('Fingerprint Engine', () => {
   })
 
   it('should detect robotic timing', () => {
-    const session = getOrCreateSession('test-robotic', '10.0.0.1', 'Mozilla/5.0')
-    // Simulate perfectly spaced requests (every 50ms) — set directly to bypass recordRequest's real timing
+    const session = store.getOrCreate('test-robotic', '10.0.0.1', 'Mozilla/5.0')
     const paths = ['/', '/about', '/products', '/contact', '/blog', '/pricing']
     session.consecutiveTiming = [50, 50, 50, 50, 50]
     session.totalRequests = paths.length
@@ -104,7 +107,7 @@ describe('Fingerprint Engine', () => {
   })
 
   it('should detect honeypot chain', () => {
-    const session = getOrCreateSession('test-chain', '10.0.0.1', 'GPTBot/1.0')
+    const session = store.getOrCreate('test-chain', '10.0.0.1', 'GPTBot/1.0')
     const honeypotPaths = ['/admin', '/internal/docs', '/secrets.env', '/.env', '/api/v2/users']
     honeypotPaths.forEach(p => recordRequest(session, p, 'text/html'))
 
