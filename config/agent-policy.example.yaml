@@ -1,0 +1,75 @@
+# AgentGate Policy Configuration
+# Copy this file to your project root as agent-policy.yaml
+
+# Mode: log_only (observe without blocking) or enforce (apply actions)
+mode: log_only
+
+# Default behavior
+defaults:
+  action: allow
+  expose_debug_headers: true
+
+# Approved agents (explicitly allowed)
+approved_agents:
+  - name: Googlebot
+    action: allow
+    paths:
+      - "/*"
+  - name: Bingbot
+    action: allow
+    paths:
+      - "/*"
+
+# Known AI agents (will trigger scoring)
+known_ai_agents:
+  - GPTBot
+  - ClaudeBot
+  - PerplexityBot
+  - CCBot
+  - Applebot-Extended
+  - Google-Extended
+  - anthropic-ai
+  - cohere-ai
+
+# Path-specific rules
+paths:
+  /admin/*:
+    action: block
+  /api/*:
+    action: challenge
+    max_requests_per_minute: 30
+  /pricing/*:
+    action: limited
+  /docs/*:
+    action: allow
+  /blog/*:
+    action: allow
+
+# Scoring configuration (overrides defaults)
+scoring:
+  weights:
+    known_ai_user_agent: 25
+    suspicious_user_agent: 15
+    missing_accept_language: 10
+    missing_cookies: 8
+    high_request_rate: 20
+    honeypot_hit: 50
+    robots_violation: 30
+    no_js_execution: 10
+    datacenter_asn: 15
+    repeated_path_pattern: 15
+    policy_mismatch: 35
+  thresholds:
+    allow: 0
+    limited: 30
+    challenge: 55
+    sandbox: 70
+    block: 90
+
+# Honeypot paths (invisible to humans)
+honeypots:
+  - /agent-honeypot
+  - /bot-trap
+  - /internal-agent-policy
+  - /scrape-check
+  - /.well-known/agent-trap

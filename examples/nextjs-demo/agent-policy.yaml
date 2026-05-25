@@ -1,0 +1,34 @@
+# Demo Policy Configuration
+mode: log_only
+
+defaults:
+  action: allow
+  expose_debug_headers: true
+
+approved_agents:
+  - name: Googlebot
+    action: allow
+  - name: Bingbot
+    action: allow
+
+known_ai_agents:
+  - GPTBot
+  - ClaudeBot
+  - PerplexityBot
+  - CCBot
+  - Applebot-Extended
+  - Google-Extended
+
+paths:
+  /admin/*:
+    action: block
+  /api/*:
+    action: challenge
+  /pricing/*:
+    action: limited
+
+honeypots:
+  - /agent-honeypot
+  - /bot-trap
+  - /internal-agent-policy
+  - /scrape-check
