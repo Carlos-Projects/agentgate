@@ -33,6 +33,10 @@ export {
 } from './core/policy';
 export { decide } from './core/decide';
 export { normalizeRequest, extractClientIP, parseCookies } from './core/normalize';
+export { analyzeContent, analyzeText, detectStegoContent } from './core/content-analyzer';
+export type { ContentAnalysisResult } from './core/content-analyzer';
+export { generateVariants, getCategories, getTechniqueCount, OBFUSCATION_TECHNIQUES } from './redteam/parseltongue';
+export type { ObfuscationResult, ObfuscationCategory } from './redteam/parseltongue';
 export { SessionStore, recordRequest, setJsVerified, setJsCookieDetected, calculateFingerprintScore, generateJsChallenge, parseFingerprintCookie, generateChallengePage } from './core/fingerprint';
 export type { FingerprintData, SessionFingerprint, RequestPattern } from './core/fingerprint';
 export { generateAgentAccessPage, generateDeclarationApiResponse } from './core/portal';
