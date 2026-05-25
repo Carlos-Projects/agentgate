@@ -12,8 +12,9 @@ describe('StaticHoneypotGenerator', () => {
   });
 
   it('should validate known honeypot tokens', () => {
-    expect(generator.validateToken('agent-honeypot')).toBe(true);
-    expect(generator.validateToken('bot-trap')).toBe(true);
+    expect(generator.validateToken('/agent-honeypot')).toBe(true);
+    expect(generator.validateToken('/bot-trap')).toBe(true);
+    expect(generator.validateToken('/unknown')).toBe(false);
   });
 
   it('should identify honeypot paths', () => {

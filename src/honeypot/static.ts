@@ -24,8 +24,7 @@ export class StaticHoneypotGenerator implements HoneypotGenerator {
   }
 
   validateToken(token: string): boolean {
-    // For static honeypots, any known honeypot path is valid
-    return this.honeypots.some((hp) => hp.includes(token));
+    return this.honeypots.some((hp) => hp === token);
   }
 
   isHoneypotPath(path: string): boolean {

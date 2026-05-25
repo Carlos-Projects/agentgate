@@ -5,6 +5,7 @@
  * For unknown agents, this serves as a declaration and logging point.
  */
 
+import * as crypto from 'crypto'
 import { AgentPolicy } from '../core/types'
 
 export interface AgentDeclaration {
@@ -192,7 +193,7 @@ export function generateDeclarationApiResponse(declaration: AgentDeclaration): {
   rateLimit: number
   allowedPaths: string[]
 } {
-  const agentId = `ag-${Math.random().toString(36).slice(2, 10)}`
+  const agentId = `ag-${crypto.randomUUID().slice(0, 8)}`
   return {
     status: 'registered',
     agentId,

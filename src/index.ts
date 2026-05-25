@@ -157,6 +157,13 @@ export class AgentGate {
   }
 
   updatePolicy(policy: Partial<AgentPolicy>): void {
+    const allowedKeys = ['mode', 'defaults', 'known_ai_agents', 'approved_agents', 'paths', 'honeypots', 'scoring']
+    for (const key of Object.keys(policy)) {
+      if (!allowedKeys.includes(key)) {
+        console.warn(`[AgentGate] Ignoring unknown policy key: ${key}`)
+        delete (policy as Record<string, unknown>)[key]
+      }
+    }
     this.policy = { ...this.policy, ...policy };
   }
 }

@@ -60,6 +60,10 @@ export function extractClientIP(headers: Record<string, string>): string {
   return 'unknown'
 }
 
+const MAX_COOKIES = 50
+const MAX_COOKIE_KEY_LENGTH = 128
+const MAX_COOKIE_VALUE_LENGTH = 4096
+
 export function parseCookies(cookieHeader?: string): Record<string, string> {
   if (!cookieHeader) {
     return {}
@@ -67,11 +71,16 @@ export function parseCookies(cookieHeader?: string): Record<string, string> {
 
   const cookies: Record<string, string> = {}
   const pairs = cookieHeader.split(';')
+  let count = 0
 
   for (const pair of pairs) {
+    if (count >= MAX_COOKIES) break
     const [key, ...valueParts] = pair.split('=')
     if (key) {
-      cookies[key.trim()] = valueParts.join('=').trim()
+      const k = key.trim().slice(0, MAX_COOKIE_KEY_LENGTH)
+      const v = valueParts.join('=').trim().slice(0, MAX_COOKIE_VALUE_LENGTH)
+      cookies[k] = v
+      count++
     }
   }
 

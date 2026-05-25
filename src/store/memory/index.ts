@@ -1,9 +1,9 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export class MemoryRateLimitStore {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async check(_keys: any, _windowMs?: any, _maxRequests?: any): Promise<any> {
-    return { allowed: true, remaining: 999, ttl: 0 }
+import { RateLimitStore } from '../types'
+
+export class MemoryRateLimitStore implements RateLimitStore {
+  async check(_keys: string[], _windowMs: number, _maxRequests: number): Promise<{ allowed: boolean; limited: boolean; remaining: number; resetAt: number; total: number }> {
+    return { allowed: true, limited: false, remaining: 999, resetAt: Date.now() + 60000, total: 0 }
   }
-  async reset(_key: string): Promise<void> {}
+  async record(_keys: string[], _windowMs: number): Promise<void> {}
   async close(): Promise<void> {}
 }

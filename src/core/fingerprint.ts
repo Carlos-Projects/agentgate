@@ -273,7 +273,7 @@ export function generateJsChallenge(): string {
   } catch(e) {}
   
   // Set verification cookie
-  document.cookie = 'agentgate_js=' + btoa(JSON.stringify(d)) + ';path=/;max-age=3600';
+  document.cookie = 'agentgate_js=' + btoa(unescape(encodeURIComponent(JSON.stringify(d)))) + ';path=/;max-age=3600;SameSite=Lax';
   
   // Report via beacon
   try {
@@ -289,7 +289,7 @@ export function generateJsChallenge(): string {
 
 export function parseFingerprintCookie(cookieValue: string): FingerprintData | null {
   try {
-    const decoded = atob(cookieValue)
+    const decoded = decodeURIComponent(escape(atob(cookieValue)))
     const raw = JSON.parse(decoded) as Record<string, unknown>
     // Map short browser API keys to our interface
     return {

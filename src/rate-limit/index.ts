@@ -1,13 +1,29 @@
-import { RateLimitStore } from '../store/types'
+import { RateLimitStore, RateLimitCheckResult } from '../store/types'
 
-export class RateLimiter {
-  constructor(_store: RateLimitStore, _config: unknown) {}
-  async check(_key: unknown): Promise<unknown> {
-    return { allowed: true, remaining: 999, ttl: 0 }
-  }
-  async close(): Promise<void> {}
+export interface RateLimiterConfig {
+  windowMs: number
+  maxRequests: number
 }
 
-export async function createRedisRateLimitStore(): Promise<never> {
-  throw new Error('Redis store requires optional dependency')
+export class RateLimiter {
+  private store: RateLimitStore
+  private config: RateLimiterConfig
+
+  constructor(store: RateLimitStore, config: RateLimiterConfig) {
+    this.store = store
+    this.config = config
+  }
+
+  async check(key: string | string[]): Promise<RateLimitCheckResult> {
+    const keys = typeof key === 'string' ? [key] : key
+    const result = await this.store.check(keys, this.config.windowMs, this.config.maxRequests)
+    if (!result.limited) {
+      await this.store.record(keys, this.config.windowMs)
+    }
+    return result
+  }
+
+  async close(): Promise<void> {
+    await this.store.close()
+  }
 }
