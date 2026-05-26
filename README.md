@@ -1,8 +1,27 @@
-# AgentGate
+# AgentGate 🔥
+
+[![CI](https://img.shields.io/github/actions/workflow/status/Carlos-Projects/agentgate/ci.yml?branch=main&logo=github)](https://github.com/Carlos-Projects/agentgate/actions)
+[![npm version](https://img.shields.io/npm/v/agentgate?logo=npm)](https://www.npmjs.com/package/agentgate)
+[![TypeScript](https://img.shields.io/badge/types-TypeScript-blue?logo=typescript)](https://www.typescriptlang.org)
+[![License](https://img.shields.io/github/license/Carlos-Projects/agentgate?logo=opensourceinitiative)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/Carlos-Projects/agentgate?style=social)](https://github.com/Carlos-Projects/agentgate)
 
 **Policy-based firewall and honeypot middleware for AI agents accessing websites**
 
-AgentGate provides a programmable perimeter for controlling how AI agents, crawlers, and automated systems access your web content. It detects automated traffic, scores risk, enforces policies, and provides observability—all without expensive infrastructure.
+AgentGate provides a programmable perimeter for controlling how AI agents, crawlers, and automated systems access your web content. It detects automated traffic, scores risk, enforces policies, and provides observability — all without expensive infrastructure.
+
+---
+
+## What makes AgentGate unique
+
+| Capability | What it does | Why it matters |
+|---|---|---|
+| **Multi-signal detection** | Combines user-agent, headers, behavior, rate limiting | No single point of failure for evasion |
+| **Graduated responses** | allow → limited → challenge → sandbox → block | Proportional response based on risk |
+| **Framework-native** | Adapters for Next.js, Express, Cloudflare Workers | Drop into any stack |
+| **Privacy-first** | IP hashing by default (GDPR-friendly) | No PII storage by default |
+
+---
 
 ## Features
 
@@ -21,6 +40,8 @@ AgentGate provides a programmable perimeter for controlling how AI agents, crawl
 - **JSONL logging**: Portable, queryable audit trail
 - **Dashboard**: Built-in analytics with authentication
 - **Framework adapters**: Next.js, Express, Cloudflare Workers
+
+---
 
 ## Quick Start
 
@@ -109,6 +130,8 @@ export async function middleware(request: NextRequest) {
 ```
 
 3. Run your Next.js app and visit `/agentgate-dashboard` to see analytics.
+
+---
 
 ## Configuration
 
@@ -391,6 +414,8 @@ Log entry format:
 }
 ```
 
+---
+
 ## Philosophy
 
 > AgentGate does not try to perfectly identify every AI agent. It creates a policy-driven perimeter where suspicious automated behavior can be scored, limited, sandboxed, blocked, or logged.
@@ -451,6 +476,8 @@ AGENTGATE_WEBHOOK_SECRET=your-signing-secret
 - ML anomaly detection
 - Browser fingerprinting
 
+---
+
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE)
