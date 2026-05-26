@@ -1,5 +1,5 @@
 {
-    "name": "agentgate",
+    "name": "agentgate-mcp",
     "version": "0.2.0",
     "description": "Policy-based firewall and honeypot middleware for AI agents accessing websites",
     "main": "dist/index.js",
