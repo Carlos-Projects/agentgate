@@ -38,6 +38,23 @@ export type { ContentAnalysisResult } from './core/content-analyzer';
 export { generateVariants, getCategories, getTechniqueCount, OBFUSCATION_TECHNIQUES } from './redteam/parseltongue';
 export type { ObfuscationResult, ObfuscationCategory } from './redteam/parseltongue';
 export { SessionStore, recordRequest, setJsVerified, setJsCookieDetected, calculateFingerprintScore, generateJsChallenge, parseFingerprintCookie, generateChallengePage } from './core/fingerprint';
+export type { FingerprintData, SessionFingerprint, RequestPattern } from './core/fingerprint';
+export { generateAgentAccessPage, generateDeclarationApiResponse } from './core/portal';
+export type { AgentDeclaration } from './core/portal';
+
+// Adapters
+export {
+  normalizeNextRequest,
+  createNextResponse,
+  handleNextMiddleware,
+} from './adapters/nextjs';
+export type { NextMiddlewareResult } from './adapters/nextjs';
+
+export {
+  normalizeExpressRequest,
+  createExpressResponse,
+  createExpressMiddleware,
+} from './adapters/express';
 
 // Honeypot
 export { StaticHoneypotGenerator, createStaticHoneypotGenerator } from './honeypot/static';

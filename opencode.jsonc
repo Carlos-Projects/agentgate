@@ -1,0 +1,30 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "agent": {
+    "build": {
+      "tools": {
+        "skill": true
+      }
+    }
+  },
+
+  "command": {
+    "test": {
+      "template": "Run `npm test` and report results.",
+      "description": "Run agentgate tests"
+    },
+    "lint": {
+      "template": "Run `npm run lint` and fix any issues.",
+      "description": "Lint agentgate code"
+    },
+    "build": {
+      "template": "Run `npm run build` and fix any compilation errors.",
+      "description": "Build agentgate"
+    },
+    "dev": {
+      "template": "Run `npm run dev` to start the TypeScript watch mode.",
+      "description": "Watch mode for agentgate"
+    }
+  }
+}
