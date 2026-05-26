@@ -1,6 +1,6 @@
 {
     "name": "agentgate-firewall",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Policy-based firewall and honeypot middleware for AI agents accessing websites",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
