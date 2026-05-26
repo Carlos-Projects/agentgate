@@ -110,6 +110,35 @@ export function validatePolicy(policy: AgentPolicy): PolicyValidationResult {
   }
 }
 
+export function loadPolicyFromJsonString(jsonContent: string): AgentPolicy {
+  try {
+    const raw = JSON.parse(jsonContent) as Record<string, unknown>
+    const parsed = stripProto(raw) as Partial<AgentPolicy>
+    return mergePolicy(parsed)
+  } catch (error) {
+    console.warn('Failed to parse policy JSON, using defaults')
+    return DEFAULT_POLICY
+  }
+}
+
+export function loadPolicyFromJson(configPath: string, allowedBase?: string): AgentPolicy {
+  try {
+    const resolved = path.resolve(configPath)
+    if (allowedBase) {
+      const relative = path.relative(allowedBase, resolved)
+      if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        console.warn('Path traversal detected in policy path, using defaults')
+        return DEFAULT_POLICY
+      }
+    }
+    const content = fs.readFileSync(configPath, 'utf-8')
+    return loadPolicyFromJsonString(content)
+  } catch (error) {
+    console.warn(`Failed to load policy from ${configPath}, using defaults`)
+    return DEFAULT_POLICY
+  }
+}
+
 export function loadPolicy(configPath: string, allowedBase?: string): AgentPolicy {
   try {
     const resolved = path.resolve(configPath)

@@ -29,6 +29,8 @@ export { calculateScore, getActionFromScore, getSignalTypes } from './core/score
 export {
   loadPolicy,
   loadPolicyFromString,
+  loadPolicyFromJson,
+  loadPolicyFromJsonString,
   getActionForPath,
   getActionForAgent,
   getScoringConfig,

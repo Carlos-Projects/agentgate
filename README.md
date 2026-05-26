@@ -1,7 +1,7 @@
 # AgentGate 🔥
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Carlos-Projects/agentgate/ci.yml?branch=main&logo=github)](https://github.com/Carlos-Projects/agentgate/actions)
-[![npm version](https://img.shields.io/npm/v/agentgate?logo=npm)](https://www.npmjs.com/package/agentgate)
+[![npm version](https://img.shields.io/npm/v/agentgate-firewall?logo=npm)](https://www.npmjs.com/package/agentgate-firewall)
 [![TypeScript](https://img.shields.io/badge/types-TypeScript-blue?logo=typescript)](https://www.typescriptlang.org)
 [![License](https://img.shields.io/github/license/Carlos-Projects/agentgate?logo=opensourceinitiative)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/Carlos-Projects/agentgate?style=social)](https://github.com/Carlos-Projects/agentgate)
@@ -48,7 +48,7 @@ AgentGate provides a programmable perimeter for controlling how AI agents, crawl
 ### Installation
 
 ```bash
-npm install agentgate
+npm install agentgate-firewall
 ```
 
 ### Basic Setup (Next.js)
@@ -99,7 +99,7 @@ known_ai_agents:
 
 ```typescript
 // middleware.ts
-import { createAgentGate, loadPolicy, createJsonlLogger } from 'agentgate'
+import { createAgentGate, loadPolicy, createJsonlLogger } from 'agentgate-firewall'
 
 const policy = loadPolicy('./agent-policy.yaml')
 const agentGate = createAgentGate({
@@ -353,7 +353,7 @@ Webhooks are signed with HMAC-SHA256 using Web Crypto API (Edge-compatible).
 
 ### Next.js
 ```typescript
-import { createAgentGate, loadPolicy } from 'agentgate'
+import { createAgentGate, loadPolicy } from 'agentgate-firewall'
 
 const agentGate = createAgentGate({ policy: loadPolicy('./agent-policy.yaml') })
 
@@ -365,7 +365,7 @@ export async function middleware(request: NextRequest) {
 
 ### Express
 ```typescript
-import { createAgentGate, createExpressMiddleware } from 'agentgate'
+import { createAgentGate, createExpressMiddleware } from 'agentgate-firewall'
 
 const agentGate = createAgentGate({ policy })
 
@@ -376,7 +376,7 @@ app.use(createExpressMiddleware(async (req) => {
 
 ### Cloudflare Workers
 ```typescript
-import { handleCloudflareRequest, createAgentGateForCloudflare } from 'agentgate'
+import { handleCloudflareRequest, createAgentGateForCloudflare } from 'agentgate-firewall'
 
 export default {
   async fetch(request: Request, env: CloudflareEnv, ctx: ExecutionContext) {
@@ -392,11 +392,11 @@ AgentGate supports multiple loggers:
 
 ```typescript
 // JSONL (production)
-import { createJsonlLogger } from 'agentgate'
+import { createJsonlLogger } from 'agentgate-firewall'
 const logger = createJsonlLogger({ filePath: './logs.jsonl' })
 
 // Console (development)
-import { createConsoleLogger } from 'agentgate'
+import { createConsoleLogger } from 'agentgate-firewall'
 const logger = createConsoleLogger({ colors: true, verbose: true })
 ```
 
@@ -415,6 +415,75 @@ Log entry format:
 ```
 
 ---
+
+## Security Considerations
+
+### Trusted Proxies
+
+When behind a reverse proxy (Cloudflare, AWS ALB, Nginx, etc.), never trust `X-Forwarded-For` headers without configuring trusted proxies:
+
+```typescript
+import { extractClientIP } from 'agentgate-firewall'
+
+// ❌ Insecure — trusts any incoming header
+const ip = extractClientIP(request.headers)
+
+// ✅ Secure — only trusts headers from known proxies
+const ip = extractClientIP(request.headers, ['203.0.113.1', '198.51.100.1'])
+```
+
+**Recommended**: Use `socket.remoteAddress` directly when not behind a proxy.
+
+### Webhook SSRF Prevention
+
+Webhooks enforce:
+- **HTTPS only** — HTTP targets are rejected
+- **Private IP blocking** — 10.x, 172.16-31.x, 192.168.x, localhost blocked
+- **DNS resolution validation** — hostnames resolving to private IPs are rejected
+- **Configurable timeout** — default 5s, max via `timeout_ms`
+- **TLS verification** — `rejectUnauthorized: true` by default
+
+### Session Security
+
+- IPs are **SHA-256 hashed** before storage (privacy by default)
+- Session IDs are **cryptographically random** (`crypto.randomUUID()`)
+- Sessions expire after configurable TTL (default 30 min)
+- Cookie attributes: `SameSite=Lax`, configurable `Secure` flag
+
+### Content Security Policy
+
+AgentGate automatically injects security headers in responses:
+
+| Action | Headers |
+|--------|---------|
+| **block** | `Content-Security-Policy: default-src 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` |
+| **challenge/sandbox** | `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` |
+
+### Privacy
+
+- **IP hashing**: Enabled by default (`hash_ip: true`). Uses HMAC-SHA256 with a random salt per process.
+- **Raw IP logging**: Disabled by default (`log_raw_ip: false`). Only enable if required for compliance.
+- **No PII**: AgentGate does not log cookies, authorization headers, or request bodies.
+- **GDPR-friendly**: Out-of-the-box configuration is compliant with data minimization principles.
+
+### Configuration Security
+
+- **YAML/JSON policies**: Both formats are supported. For production, use JSON with `loadPolicyFromJson()` for reduced attack surface. Both run through `stripProto()` to prevent prototype pollution.
+- **Environment variables**: Sensitive configuration (Redis tokens, webhook secrets, dashboard tokens) should use environment variables, not inline in policy files.
+- **Log file path**: Relative paths with `..` are rejected to prevent path traversal.
+
+### Production Security Checklist
+
+- [ ] Configure **trusted proxies** in `extractClientIP()`
+- [ ] Use **Redis** rate limiting (`store: redis`)
+- [ ] Set `AGENTGATE_DASHBOARD_TOKEN` environment variable
+- [ ] Enable **webhooks** with HTTPS targets and HMAC secrets
+- [ ] Set `cookie_secure: true` (requires HTTPS)
+- [ ] Disable `expose_debug_headers` (set to `false`)
+- [ ] Use `failure_mode: challenge` (not `open`)
+- [ ] Use `loadPolicyFromJson()` for reduced attack surface
+- [ ] Start **`log_only` mode** for 1-2 weeks before enforcing
+- [ ] Review audit logs for `[AgentGate Audit]` warnings (block/sandbox/challenge events)
 
 ## Philosophy
 

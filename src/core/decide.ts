@@ -59,13 +59,30 @@ export function decide(
     result.redirectPath = '/agent-sandbox';
   }
 
+  // Security headers
+  const securityHeaders: Record<string, string> = {};
+
+  if (finalAction === 'block') {
+    securityHeaders['Content-Security-Policy'] = "default-src 'none'; frame-ancestors 'none'; sandbox";
+    securityHeaders['X-Content-Type-Options'] = 'nosniff';
+    securityHeaders['X-Frame-Options'] = 'DENY';
+  }
+
+  if (finalAction === 'challenge' || finalAction === 'sandbox') {
+    securityHeaders['X-Content-Type-Options'] = 'nosniff';
+    securityHeaders['X-Frame-Options'] = 'DENY';
+  }
+
   // Add debug headers if enabled
   if (policy.defaults.expose_debug_headers) {
     result.headers = {
+      ...securityHeaders,
       'X-AgentGate-Score': score.toString(),
       'X-AgentGate-Action': finalAction,
       'X-AgentGate-Signals': getSignalTypes(signals).join(','),
     };
+  } else if (Object.keys(securityHeaders).length > 0) {
+    result.headers = securityHeaders;
   }
 
   return result;
