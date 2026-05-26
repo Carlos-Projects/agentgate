@@ -11,5 +11,5 @@
     "rootDir": "./src"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "tests", "src/adapters", "src/bin"]
+  "exclude": ["node_modules", "dist", "tests", "src/adapters/nextjs.ts", "src/adapters/express.ts", "src/adapters/cloudflare.ts"]
 }

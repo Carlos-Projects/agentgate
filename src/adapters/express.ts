@@ -29,23 +29,19 @@ export function normalizeExpressRequest(req: Request): AdapterRequest {
 
 export function createExpressResponse(result: DecisionResult, res: Response): void {
   res.setHeader('Content-Type', 'application/json');
-  
   if (result.headers) {
     Object.entries(result.headers).forEach(([key, value]) => {
       if (key !== 'Set-Cookie') res.setHeader(key, value);
     });
   }
-
   if (result.action === 'block') {
     res.status(403).json({ error: 'Access denied', reason: result.reason, score: result.score });
     return;
   }
-
   if (result.redirectPath) {
-    res.redirect(result.redirectPath);
+    res.redirect(302, result.redirectPath);
     return;
   }
-
   res.status(200).json({ action: result.action });
 }
 

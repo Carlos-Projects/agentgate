@@ -34,7 +34,7 @@ export function createNextResponse(result: DecisionResult, originalUrl: string):
     return NextResponse.json({ error: 'Access denied', reason: result.reason, score: result.score }, { status: 403, headers: response.headers });
   }
   if (result.redirectPath) {
-    return NextResponse.redirect(new URL(result.redirectPath, originalUrl), { headers: response.headers });
+    return NextResponse.redirect(result.redirectPath + '?_=' + Date.now(), { headers: response.headers });
   }
   return response;
 }
@@ -42,8 +42,9 @@ export function createNextResponse(result: DecisionResult, originalUrl: string):
 export interface NextMiddlewareResult { response: NextResponse; shouldContinue: boolean; }
 
 export function handleNextMiddleware(req: NextRequest, result: DecisionResult): NextMiddlewareResult {
+  const reqUrl = req.nextUrl.toString();
   if (result.action === 'block' || result.redirectPath) {
-    return { response: createNextResponse(result, req.url), shouldContinue: false };
+    return { response: createNextResponse(result, reqUrl), shouldContinue: false };
   }
-  return { response: createNextResponse(result, req.url), shouldContinue: true };
+  return { response: createNextResponse(result, reqUrl), shouldContinue: true };
 }

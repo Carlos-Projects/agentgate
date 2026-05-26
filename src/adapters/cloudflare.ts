@@ -44,7 +44,8 @@ export async function handleCloudflareRequest(request: Request, env: CloudflareE
   if (url.pathname.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|map)$/i) || url.pathname.startsWith('/_next')) {
     return fetch(request)
   }
-  const result = await agentGate.processRequest(normalizeCloudflareRequest(request), { waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) })
+  const adapterReq = normalizeCloudflareRequest(request)
+  const result = await agentGate.processRequest(adapterReq, { waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p) })
   if (result.action === 'block') return createBlockResponse(result)
   if (result.redirectPath) return createRedirectResponse(result, request.url)
   const originResponse = await fetch(request)
