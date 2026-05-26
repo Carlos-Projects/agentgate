@@ -1,13 +1,20 @@
 #!/usr/bin/env node
 /**
  * AgentGate Standalone Server
+ *
+ * WARNING: This server is a stub and provides NO security enforcement.
+ * Integrate agentgate as Express/Next.js middleware instead.
  */
 
-const port = process.env.PORT || '3000'
-console.log(`AgentGate server starting on port ${port}...`)
-console.log('Configure with Next.js or Express middleware.')
-const server = require('http').createServer((req: any, res: any) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' })
-  res.end('AgentGate server is running. Configure with Next.js or Express middleware.')
-})
-server.listen(port)
+console.error('')
+console.error('  ⚠️  WARNING: agentgate-server is a stub. It provides NO security enforcement.')
+console.error('  ⚠️  Integrate agentgate as middleware in your existing app:')
+console.error('  ⚠️    const { AgentGate } = require("agentgate")')
+console.error('  ⚠️    const gate = new AgentGate({ policy: myPolicy })')
+console.error('  ⚠️    app.use((req, res, next) => gate.processRequest(adapterRequest))')
+console.error('')
+
+throw new Error(
+  'agentgate-server is a stub. It provides NO security enforcement. ' +
+  'Integrate agentgate as middleware in your existing application instead.'
+)

@@ -9,3 +9,10 @@ export interface RateLimitStore {
 export interface AgentSession {
   id: string; ip: string; userAgent: string; createdAt: number; lastSeenAt: number; requestCount: number; score: number
 }
+
+export interface SessionPersistenceStore {
+  get(id: string): Promise<AgentSession | null>
+  set(id: string, data: AgentSession): Promise<void>
+  delete(id: string): Promise<void>
+  close(): Promise<void>
+}

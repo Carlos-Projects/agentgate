@@ -110,12 +110,15 @@ export function validatePolicy(policy: AgentPolicy): PolicyValidationResult {
   }
 }
 
-export function loadPolicy(configPath: string): AgentPolicy {
+export function loadPolicy(configPath: string, allowedBase?: string): AgentPolicy {
   try {
     const resolved = path.resolve(configPath)
-    if (resolved.includes('..')) {
-      console.warn('Path traversal detected in policy path, using defaults')
-      return DEFAULT_POLICY
+    if (allowedBase) {
+      const relative = path.relative(allowedBase, resolved)
+      if (relative.startsWith('..') || path.isAbsolute(relative)) {
+        console.warn('Path traversal detected in policy path, using defaults')
+        return DEFAULT_POLICY
+      }
     }
     const content = fs.readFileSync(configPath, 'utf-8')
     const raw = yaml.load(content, { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>
@@ -193,21 +196,22 @@ function matchPath(path: string, pattern: string): boolean {
 }
 
 export function getScoringConfig(policy: AgentPolicy): ScoringConfig {
-  const userWeights = policy.scoring?.weights
+  const cleanScoring = policy.scoring ? stripProto(policy.scoring) as Partial<ScoringConfig> : {}
+  const userWeights = cleanScoring && 'weights' in cleanScoring && cleanScoring.weights
     ? Object.fromEntries(
-        Object.entries(policy.scoring.weights)
+        Object.entries(cleanScoring.weights as Record<string, number>)
           .filter(([k]) => !['__proto__', 'constructor', 'prototype'].includes(k))
       )
     : {}
-  const userThresholds = policy.scoring?.thresholds
+  const userThresholds = cleanScoring && 'thresholds' in cleanScoring && cleanScoring.thresholds
     ? Object.fromEntries(
-        Object.entries(policy.scoring.thresholds)
+        Object.entries(cleanScoring.thresholds as Record<string, number>)
           .filter(([k]) => !['__proto__', 'constructor', 'prototype'].includes(k))
       )
     : {}
   return {
     ...DEFAULT_SCORING_CONFIG,
-    ...policy.scoring,
+    ...cleanScoring,
     weights: { ...DEFAULT_SCORING_CONFIG.weights, ...userWeights },
     thresholds: { ...DEFAULT_SCORING_CONFIG.thresholds, ...userThresholds },
   }

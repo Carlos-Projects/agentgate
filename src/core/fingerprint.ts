@@ -309,8 +309,10 @@ export function parseFingerprintCookie(cookieValue: string): FingerprintData | n
   }
 }
 
+import { escapeHtml } from './escape'
+
 export function generateChallengePage(redirectTo: string): string {
-  const safeUrl = redirectTo.replace(/'/g, '').replace(/"/g, '')
+  const safeUrl = escapeHtml(redirectTo.replace(/'/g, '').replace(/"/g, ''))
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8">

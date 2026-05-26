@@ -22,11 +22,36 @@ export interface DashboardSummary {
   recentEvents: LogEntry[];
 }
 
+const DASHBOARD_SUMMARY_RATE_LIMIT = 10
+const DASHBOARD_SUMMARY_WINDOW = 60_000
+const summaryRateBuckets = new Map<string, { count: number; windowStart: number }>()
+
+function checkSummaryRateLimit(clientIp: string): boolean {
+  const now = Date.now()
+  let bucket = summaryRateBuckets.get(clientIp)
+  if (!bucket || now - bucket.windowStart > DASHBOARD_SUMMARY_WINDOW) {
+    bucket = { count: 0, windowStart: now }
+    summaryRateBuckets.set(clientIp, bucket)
+  }
+  bucket.count++
+  return bucket.count <= DASHBOARD_SUMMARY_RATE_LIMIT
+}
+
 export async function generateSummary(
   logFilePath: string,
-  limit: number = 1000
+  limit: number = 1000,
+  clientIp: string = '127.0.0.1'
 ): Promise<DashboardSummary> {
-  const logs = await readLogs(logFilePath, { limit });
+  if (!checkSummaryRateLimit(clientIp)) {
+    console.warn(`Dashboard summary rate limit exceeded for ${clientIp}`)
+    return {
+      totalRequests: 0, suspectedAgents: 0, topUserAgents: [], topPaths: [],
+      honeypotHits: 0, actionsTaken: {}, scoreDistribution: { low: 0, medium: 0, high: 0, critical: 0 },
+      recentEvents: [],
+    }
+  }
+
+  const logs = await readLogs(logFilePath, { limit }, clientIp);
 
   const summary: DashboardSummary = {
     totalRequests: logs.length,

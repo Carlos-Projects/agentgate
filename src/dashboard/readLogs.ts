@@ -17,10 +17,30 @@ export interface LogQueryOptions {
   endDate?: string;
 }
 
+const DASHBOARD_RATE_LIMIT = 30
+const DASHBOARD_RATE_WINDOW = 60_000
+const dashboardRateBuckets = new Map<string, { count: number; windowStart: number }>()
+
+function checkDashboardRateLimit(clientIp: string): boolean {
+  const now = Date.now()
+  let bucket = dashboardRateBuckets.get(clientIp)
+  if (!bucket || now - bucket.windowStart > DASHBOARD_RATE_WINDOW) {
+    bucket = { count: 0, windowStart: now }
+    dashboardRateBuckets.set(clientIp, bucket)
+  }
+  bucket.count++
+  return bucket.count <= DASHBOARD_RATE_LIMIT
+}
+
 export async function readLogs(
   logFilePath: string,
-  options: LogQueryOptions = {}
+  options: LogQueryOptions = {},
+  clientIp: string = '127.0.0.1'
 ): Promise<LogEntry[]> {
+  if (!checkDashboardRateLimit(clientIp)) {
+    console.warn(`Dashboard rate limit exceeded for ${clientIp}`)
+    return []
+  }
   const filePath = path.resolve(logFilePath);
 
   if (!fs.existsSync(filePath)) {
@@ -62,7 +82,11 @@ export async function readLogs(
   }
 }
 
-export async function countLogs(logFilePath: string): Promise<number> {
+export async function countLogs(logFilePath: string, clientIp: string = '127.0.0.1'): Promise<number> {
+  if (!checkDashboardRateLimit(clientIp)) {
+    console.warn(`Dashboard rate limit exceeded for ${clientIp}`)
+    return 0
+  }
   const filePath = path.resolve(logFilePath);
 
   if (!fs.existsSync(filePath)) {

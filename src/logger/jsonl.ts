@@ -23,6 +23,10 @@ export class JsonlLogger implements Logger {
   private options: Required<JsonlLoggerOptions>;
 
   constructor(options: JsonlLoggerOptions = {}) {
+    if (options.filePath && options.filePath.includes('..')) {
+      console.warn('Path traversal detected in log file path, using default')
+      delete options.filePath
+    }
     this.options = { ...DEFAULT_OPTIONS, ...options };
   }
 

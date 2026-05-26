@@ -8,6 +8,8 @@ export {
   DEFAULT_POLICY,
   DEFAULT_SCORING_CONFIG,
 } from './core/types';
+
+
 export type {
   AgentGateAction,
   AgentPolicy,
@@ -22,7 +24,7 @@ export type {
   HoneypotGenerator,
 } from './core/types';
 
-export { detectSignals, isHoneypotPath } from './core/detect';
+export { detectSignals, isHoneypotPath, cleanupRateTracking } from './core/detect';
 export { calculateScore, getActionFromScore, getSignalTypes } from './core/score';
 export {
   loadPolicy,
@@ -71,6 +73,14 @@ export type { JsonlLoggerOptions } from './logger/jsonl';
 export { ConsoleLogger, createConsoleLogger } from './logger/console';
 export type { ConsoleLoggerOptions } from './logger/console';
 
+// Session
+export { SessionManager } from './session/index';
+export type { SessionResult } from './session/index';
+
+// Store
+export { MemorySessionStore } from './store/memory/index';
+export type { SessionPersistenceStore } from './store/types';
+
 // Dashboard
 export { readLogs, countLogs } from './dashboard/readLogs';
 export type { LogQueryOptions } from './dashboard/readLogs';
@@ -99,11 +109,39 @@ export class AgentGate {
   constructor(options: AgentGateOptions) {
     this.policy = options.policy;
     this.logger = options.logger;
+
+    if (this.policy.rate_limit?.enabled && this.policy.rate_limit.store === 'redis') {
+      throw new Error('Redis stores are not implemented yet. Set rate_limit.store to "memory" or integrate agentgate as middleware.')
+    }
+
+    if (this.policy.dashboard?.require_auth && !process.env.AGENTGATE_DASHBOARD_TOKEN) {
+      throw new Error('Dashboard auth enabled but AGENTGATE_DASHBOARD_TOKEN environment variable not set.')
+    }
   }
 
   async processRequest(req: AdapterRequest): Promise<DecisionResult> {
     const startTime = Date.now();
     const context = normalizeRequest(req);
+
+    // Dashboard auth enforcement
+    if (this.policy.dashboard?.enabled && this.policy.dashboard?.require_auth) {
+      const dashboardPaths = ['/agentgate-dashboard', '/agentgate-verify', '/agentgate-declare', '/agentgate-api']
+      if (dashboardPaths.some(p => context.path.startsWith(p))) {
+        const authHeader = context.headers['authorization'] || context.headers['x-dashboard-token'] || ''
+        const expectedToken = process.env.AGENTGATE_DASHBOARD_TOKEN || ''
+        if (!expectedToken) {
+          throw new Error('Dashboard auth enabled but AGENTGATE_DASHBOARD_TOKEN not configured.')
+        }
+        if (authHeader !== `Bearer ${expectedToken}` && authHeader !== expectedToken) {
+          return {
+            action: 'block',
+            score: 100,
+            signals: ['policy_mismatch'],
+            reason: 'Unauthorized dashboard access',
+          }
+        }
+      }
+    }
 
     // Detect signals
     const signals = detectSignals(context, this.policy);
@@ -135,6 +173,23 @@ export class AgentGate {
         referer: context.referer,
         responseTime: Date.now() - startTime,
       });
+    }
+
+    // Audit trail for critical decisions
+    if (result.action === 'block' || result.action === 'sandbox' || result.action === 'challenge') {
+      const auditEntry = {
+        type: 'audit' as const,
+        timestamp: new Date().toISOString(),
+        action: result.action,
+        score: result.score,
+        signals: result.signals,
+        ip: context.ip,
+        path: context.path,
+        userAgent: context.userAgent,
+        method: context.method,
+        reason: result.reason,
+      }
+      console.warn(`[AgentGate Audit] ${auditEntry.action.toUpperCase()} score=${auditEntry.score} path=${auditEntry.path} ip=${auditEntry.ip}`)
     }
 
     return result;

@@ -9,13 +9,21 @@ import { RequestContext, Signal, SignalType, AgentPolicy } from './types';
 const RATE_WINDOW_MS = 60_000
 const RATE_LIMIT = 60
 const rateBuckets = new Map<string, { count: number; windowStart: number }>()
-const RATE_CLEANUP_INTERVAL = setInterval(() => {
+let RATE_CLEANUP_INTERVAL: ReturnType<typeof setInterval> | null = setInterval(() => {
   const cutoff = Date.now() - RATE_WINDOW_MS
   for (const [ip, bucket] of rateBuckets) {
     if (bucket.windowStart < cutoff) rateBuckets.delete(ip)
   }
 }, 5 * 60_000)
-RATE_CLEANUP_INTERVAL.unref?.()
+if (RATE_CLEANUP_INTERVAL) RATE_CLEANUP_INTERVAL.unref?.()
+
+export function cleanupRateTracking(): void {
+  if (RATE_CLEANUP_INTERVAL) {
+    clearInterval(RATE_CLEANUP_INTERVAL)
+    RATE_CLEANUP_INTERVAL = null
+  }
+  rateBuckets.clear()
+}
 
 const KNOWN_AI_AGENTS_DEFAULT = [
   'GPTBot',

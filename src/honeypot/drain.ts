@@ -8,6 +8,7 @@
  */
 
 import { HONEYPOT_PAGES } from './content'
+import { escapeHtml } from '../core/escape'
 
 export interface DrainStrategy {
   name: string
@@ -138,7 +139,7 @@ function generateDeeplyNestedJson(depth: number): Record<string, unknown> {
 
 function wrapInHtml(body: string, title: string): string {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-<title>${title}</title>
+<title>${escapeHtml(title)}</title>
 <style>body{font-family:system-ui;background:#0d1117;color:#e1e4e8;padding:2rem;max-width:800px;margin:auto}
 a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
 h1{color:#58a6ff}h3{color:#bc8cff}ul{list-style:none;padding:0}

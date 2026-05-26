@@ -1,17 +1,46 @@
 import * as crypto from 'crypto'
-import * as http from 'http'
 import * as https from 'https'
+import * as net from 'net'
 
 export interface WebhookTarget {
   name: string
   url: string
   secret?: string
   events: string[]
+  timeout_ms?: number
 }
 
 export interface WebhookConfig {
   enabled: boolean
   targets: WebhookTarget[]
+}
+
+function isPrivateIP(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return true
+  if (net.isIP(hostname)) {
+    const parts = hostname.split('.').map(Number)
+    if (parts[0] === 10) return true
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true
+    if (parts[0] === 192 && parts[1] === 168) return true
+    if (parts[0] === 127) return true
+    if (parts[0] === 0) return true
+  }
+  return false
+}
+
+function validateUrl(url: string): URL | null {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return null
+  }
+
+  if (parsed.protocol !== 'https:') return null
+
+  if (isPrivateIP(parsed.hostname)) return null
+
+  return parsed
 }
 
 export class WebhookSender {
@@ -40,9 +69,11 @@ export class WebhookSender {
   private deliver(target: WebhookTarget, body: string): Promise<void> {
     return new Promise((resolve) => {
       try {
-        const url = new URL(target.url)
-        const isHttps = url.protocol === 'https:'
-        const lib = isHttps ? https : http
+        const url = validateUrl(target.url)
+        if (!url) {
+          resolve()
+          return
+        }
 
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -58,12 +89,15 @@ export class WebhookSender {
           headers['X-Signature-256'] = signature
         }
 
-        const req = lib.request(
+        const timeout = target.timeout_ms || 5_000
+
+        const req = https.request(
           url,
           {
             method: 'POST',
             headers,
-            timeout: 10_000,
+            timeout,
+            rejectUnauthorized: true,
           },
           (res) => {
             res.resume()

@@ -4,6 +4,8 @@
  * designed to trap AI agents and waste their resources.
  */
 
+import { escapeHtml } from '../core/escape'
+
 export interface FakePage {
   path: string
   title: string
@@ -42,22 +44,22 @@ function fakeAdminPanel(visit: number): string {
 
   const userRows = users.map(u => `
     <tr>
-      <td>${u.name}</td>
-      <td>${u.role}</td>
-      <td>${u.email}</td>
-      <td>${u.lastLogin}</td>
-      <td><a href="/admin/user/${u.name}">Edit</a></td>
+      <td>${escapeHtml(u.name)}</td>
+      <td>${escapeHtml(u.role)}</td>
+      <td>${escapeHtml(u.email)}</td>
+      <td>${escapeHtml(u.lastLogin)}</td>
+      <td><a href="/admin/user/${escapeHtml(u.name)}">Edit</a></td>
     </tr>`).join('')
 
   const sessionRows = sessions.map(s => `
     <tr>
-      <td>${s.ip}</td><td>${s.user}</td><td>${s.started}</td><td>${s.expires}</td>
+      <td>${escapeHtml(s.ip)}</td><td>${escapeHtml(s.user)}</td><td>${escapeHtml(s.started)}</td><td>${escapeHtml(s.expires)}</td>
     </tr>`).join('')
 
   const configRows = configKeys.map(k => `
     <tr>
-      <td><code>${k.key}</code></td>
-      <td><code>${k.value}</code></td>
+      <td><code>${escapeHtml(k.key)}</code></td>
+      <td><code>${escapeHtml(k.value)}</code></td>
     </tr>`).join('')
 
   return `<!DOCTYPE html>
@@ -99,7 +101,7 @@ This system contains confidential operational data.
 <div class="card">
 <h2>Configuration (${visit > 1 ? configKeys.slice(0, -visit + 1).length : configKeys.length} keys)</h2>
 <table>${visit > 1 ? configKeys.slice(0, -visit + 1).map(k => `
-  <tr><td><code>${k.key}</code></td><td><code>${k.value}</code></td></tr>`).join('') : configRows}
+  <tr><td><code>${escapeHtml(k.key)}</code></td><td><code>${escapeHtml(k.value)}</code></td></tr>`).join('') : configRows}
 </table>
 </div>
 <div class="card">
@@ -115,7 +117,7 @@ ${'[2026-05-25 0' + (Math.floor(Math.random() * 7)) + ':00:00] INFO  Health chec
 </pre>
 </div>
 <footer style="margin-top:2rem;color:#484f58;font-size:.85em">
-Visit #${visit} · Internal use only · Page generated at ${new Date().toISOString()}
+Visit #${escapeHtml(String(visit))} · Internal use only · Page generated at ${escapeHtml(new Date().toISOString())}
 </footer></body></html>`
 }
 
@@ -157,10 +159,10 @@ X-Internal-Key: ik-${Array.from({length: 24}, () => Math.random().toString(36)[2
 <tr><th>Method</th><th>Path</th><th>Parameters</th><th>Auth</th><th>Rate Limit</th></tr>
 ${endpoints.map(e => `<tr>
   <td><span class="method ${e.method === 'GET' ? 'get' : e.method === 'POST' ? 'post' : 'delete'}">${e.method}</span></td>
-  <td><code>${e.path}</code></td>
-  <td><small>${e.params}</small></td>
-  <td><small>${e.auth}</small></td>
-  <td><small>${e.rate}</small></td>
+  <td><code>${escapeHtml(e.path)}</code></td>
+  <td><small>${escapeHtml(e.params)}</small></td>
+  <td><small>${escapeHtml(e.auth)}</small></td>
+  <td><small>${escapeHtml(e.rate)}</small></td>
 </tr>`).join('')}
 </table>
 
@@ -300,7 +302,7 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}</style><
 <div class="card">
 <h2>📄 Documentation</h2>
 <ul>
-${subpages.map(p => `<li><a href="${p}">${p.replace('/internal/', '').replace(/-/g, ' ').replace(/\//g, ' → ')}</a></li>`).join('\n')}
+${subpages.map(p => `<li><a href="${escapeHtml(p)}">${escapeHtml(p.replace('/internal/', '').replace(/-/g, ' ').replace(/\//g, ' → '))}</a></li>`).join('\n')}
 </ul>
 </div>
 
@@ -315,7 +317,7 @@ ${subpages.map(p => `<li><a href="${p}">${p.replace('/internal/', '').replace(/-
 </div>
 
 <footer style="color:#484f58;font-size:.85em;margin-top:2rem">
-Internal wiki · Visit #${visit} · ${new Date().toISOString()}
+Internal wiki · Visit #${escapeHtml(String(visit))} · ${escapeHtml(new Date().toISOString())}
 </footer></body></html>`
 }
 
@@ -398,11 +400,11 @@ export function generateInfiniteContent(pageSize: number = 100_000): string {
   return `<!DOCTYPE html><html><head><title>Document Repository</title>
 <style>body{font-family:monospace;background:#0d1117;color:#e1e4e8;padding:2rem;word-wrap:break-word}
 p{margin:.5em 0;line-height:1.6}</style></head>
-<body><h1>📄 Document Archive — Page ${Math.floor(Math.random() * 1000) + 1}</h1>
-<p style="color:#8b949e">Total size: ~${(pageSize / 1024).toFixed(0)} KB · ${paragraphs} paragraphs</p>
+<body><h1>📄 Document Archive — Page ${escapeHtml(String(Math.floor(Math.random() * 1000) + 1))}</h1>
+<p style="color:#8b949e">Total size: ~${escapeHtml((pageSize / 1024).toFixed(0))} KB · ${escapeHtml(String(paragraphs))} paragraphs</p>
 ${body}
 <footer style="margin-top:2rem;color:#484f58">
-<a href="?page=${Math.floor(Math.random() * 1000) + 1}" style="color:#58a6ff">Next page →</a>
+<a href="?page=${escapeHtml(String(Math.floor(Math.random() * 1000) + 1))}" style="color:#58a6ff">Next page →</a>
 </footer></body></html>`
 }
 
@@ -419,11 +421,11 @@ export function generateRecursiveLinks(depth: number = 0): string {
   ]
 
   return `<div style="padding:1rem;margin:.5rem 0;border-left:3px solid #30363d;background:#161b22">
-<h3>Level ${depth + 1}</h3>
-<p style="color:#8b949e;font-size:.9em">Related documents (${paths.length} links):</p>
+<h3>Level ${escapeHtml(String(depth + 1))}</h3>
+<p style="color:#8b949e;font-size:.9em">Related documents (${escapeHtml(String(paths.length))} links):</p>
 <ul>
-${paths.map(p => `<li><a href="${p}" style="color:#58a6ff">${p.replace('/internal/', '').replace(/-/g, ' ').replace(/\//g, ' → ')}</a></li>`).join('\n')}
+${paths.map(p => `<li><a href="${escapeHtml(p)}" style="color:#58a6ff">${escapeHtml(p.replace('/internal/', '').replace(/-/g, ' ').replace(/\//g, ' → '))}</a></li>`).join('\n')}
 </ul>
-${depth < 3 ? `<p><a href="/internal/recursive?depth=${depth + 1}" style="color:#bc8cff">→ Explore deeper (level ${depth + 2})</a></p>` : ''}
+${depth < 3 ? `<p><a href="/internal/recursive?depth=${escapeHtml(String(depth + 1))}" style="color:#bc8cff">→ Explore deeper (level ${escapeHtml(String(depth + 2))})</a></p>` : ''}
 </div>`
 }

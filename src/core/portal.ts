@@ -7,6 +7,7 @@
 
 import * as crypto from 'crypto'
 import { AgentPolicy } from '../core/types'
+import { escapeHtml } from './escape'
 
 export interface AgentDeclaration {
   agentName: string
@@ -24,7 +25,7 @@ export interface AgentDeclaration {
 
 export function generateAccessPolicyDeclaration(agentName: string): string {
   return `<!--
-  AgentGate Access Policy for ${agentName}
+  AgentGate Access Policy for ${escapeHtml(agentName)}
   
   This site uses AgentGate to manage AI agent access.
   To access this site, please:
@@ -34,10 +35,6 @@ export function generateAccessPolicyDeclaration(agentName: string): string {
 
   For questions, contact: security@site-owner.example.com
 -->`
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
 }
 
 export function generateAgentAccessPage(policy: AgentPolicy): string {
@@ -197,7 +194,7 @@ export function generateDeclarationApiResponse(declaration: AgentDeclaration): {
   return {
     status: 'registered',
     agentId,
-    instructions: `Include header X-Agent-ID: ${agentId} in all requests`,
+    instructions: `Include header X-Agent-ID: ${escapeHtml(agentId)} in all requests`,
     rateLimit: declaration.rate_limit || 60,
     allowedPaths: ['/public/*', '/docs/*', '/blog/*'],
   }
