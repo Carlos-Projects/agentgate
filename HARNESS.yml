@@ -1,7 +1,7 @@
 schema: carlos-harness/v1
 project:
   name: AgentGate
-  owner: Carlos Rocha
+  owner: Carlos-Projects
   status: active
   domain: web-agent-perimeter
   summary: Policy-based firewall and honeypot middleware for AI agents, crawlers, and automated systems accessing websites.
@@ -74,7 +74,7 @@ evidence:
 
 integrations:
   obsidian_notes:
-    - "/Users/carlosrocha/Documents/Obsidian Vault/03_Projects/agentgate-firewall/Sesión 2026-05-25 - Security Review & npm Publish.md"
+    - "./Sesión 2026-05-25 - Security Review & npm Publish.md"
   github_repo: "Carlos-Projects/agentgate"
   website: ""
   package: "agentgate-firewall"
