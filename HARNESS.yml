@@ -1,0 +1,88 @@
+schema: carlos-harness/v1
+project:
+  name: AgentGate
+  owner: Carlos Rocha
+  status: active
+  domain: web-agent-perimeter
+  summary: Policy-based firewall and honeypot middleware for AI agents, crawlers, and automated systems accessing websites.
+
+context_budget:
+  startup_files:
+    - AGENTS.md
+    - HARNESS.yml
+    - progress/current.md
+    - docs/architecture.md
+    - docs/verification.md
+  max_startup_lines: 500
+  prefer_search_over_bulk_read: true
+
+agent_adapters:
+  codex:
+    entrypoint: AGENTS.md
+    progress_file: progress/current.md
+  opencode:
+    config_file: opencode.jsonc
+    instructions:
+      - AGENTS.md
+      - HARNESS.yml
+      - progress/current.md
+    use_skills_for_execution_not_memory: true
+  claude:
+    entrypoint: AGENTS.md
+  cursor:
+    entrypoint: AGENTS.md
+
+commands:
+  setup:
+    - "npm install"
+  test:
+    - "npm test"
+  lint:
+    - "npm run lint"
+  typecheck:
+    - "npm run build"
+  build:
+    - "npm run build"
+  run:
+    - "npm run dev"
+  security:
+    - "verify webhook targets cannot SSRF private networks"
+    - "verify policy loading strips prototype pollution inputs"
+    - "verify trusted proxy settings are explicit in production"
+
+governance:
+  policy_file: policies/default.yaml
+  audit_log: progress/audit.jsonl
+  token_budget:
+    max_tokens_per_session: 120000
+    max_tokens_per_task: 30000
+  approval_required_for:
+    - secrets
+    - production_deploy
+    - database_migration
+    - destructive_command
+    - public_publish
+
+evidence:
+  required_artifacts:
+    - progress/current.md
+    - progress/history.md
+  optional_artifacts:
+    - reports/security.md
+    - reports/test-results.md
+    - reports/redteam.md
+
+integrations:
+  obsidian_notes:
+    - "/Users/carlosrocha/Documents/Obsidian Vault/03_Projects/agentgate-firewall/Sesión 2026-05-25 - Security Review & npm Publish.md"
+  github_repo: "Carlos-Projects/agentgate"
+  website: ""
+  package: "agentgate-firewall"
+
+agt_alignment:
+  microsoft_pattern: "policy-as-code perimeter, audit, rate limiting, and web-agent gateway"
+  local_role: "web perimeter complement to MCPGuard"
+  next_integrations:
+    - "Emit mcp-taxonomy compatible web-agent events"
+    - "Align policy examples with harness default deny/approval model"
+    - "Forward high-risk events to ThreatLens"

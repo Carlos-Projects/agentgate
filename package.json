@@ -27,7 +27,7 @@
         "express",
         "cloudflare"
     ],
-    "author": "Carlos Rocha <carlos@carlosrocha.dev>",
+    "author": "Carlos-Projects <Carlos@AIAgentObservatory.org>",
     "homepage": "https://github.com/Carlos-Projects/agentgate",
     "license": "MIT",
     "devDependencies": {
