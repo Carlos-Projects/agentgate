@@ -74,7 +74,7 @@ evidence:
 
 integrations:
   obsidian_notes:
-    - "./Sesión 2026-05-25 - Security Review & npm Publish.md"
+    - "/Users/carlosrocha/Documents/Obsidian Vault/03_Projects/agentgate-firewall/Sesión 2026-05-25 - Security Review & npm Publish.md"
   github_repo: "Carlos-Projects/agentgate"
   website: ""
   package: "agentgate-firewall"
