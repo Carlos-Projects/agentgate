@@ -573,6 +573,14 @@ MCPGuard            →  Runtime security proxy for MCP/A2A protocols.
 
 ---
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+
+## Security
+
+Found a vulnerability? See [SECURITY.md](SECURITY.md).
+
 ## License
 
 MIT — see [LICENSE](LICENSE)
