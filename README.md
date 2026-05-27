@@ -8,7 +8,14 @@
 
 **Policy-based firewall and honeypot middleware for AI agents accessing websites**
 
+> Palisade scans content before agents read it.
+> MCPwn attacks tool servers before agents trust them.
+> **AgentGate protects websites when agents visit them.**
+> MCPscop centralizes the findings.
+
 AgentGate provides a programmable perimeter for controlling how AI agents, crawlers, and automated systems access your web content. It detects automated traffic, scores risk, enforces policies, and provides observability — all without expensive infrastructure.
+
+**Use case:** You run a website. AI agents are scraping, browsing, and interacting with it. You want to allow good agents, sandbox suspicious ones, and block hostile automation — without breaking the experience for human visitors.
 
 ---
 
@@ -547,14 +554,22 @@ AGENTGATE_WEBHOOK_SECRET=your-signing-secret
 
 ---
 
-## Related Projects
+## Ecosystem
 
-AgentGate is part of the **Carlos-Projects** security ecosystem for AI agents:
+AgentGate is part of the **Carlos-Projects** security infrastructure for AI agents:
 
-- [**MCPGuard**](https://github.com/Carlos-Projects/mcpguard) — Runtime security proxy for MCP/A2A protocols with HTMX dashboard
-- [**MCPwn**](https://github.com/Carlos-Projects/mcpwn) — Offensive security testing framework for MCP servers
-- [**Palisade Scanner**](https://github.com/Carlos-Projects/palisade-scanner) — Scan web content for prompt injection and adversarial content
-- [**MCPscop**](https://github.com/Carlos-Projects/mcpscope) — Unified security dashboard for MCP/A2A scanner results
+```
+Palisade Scanner    →  Scan content before agents consume it.
+MCPwn               →  Attack MCP servers before attackers do.
+AgentGate           →  Control how agents access your website.  ← you are here
+MCPscop             →  Centralize scanner results and security posture.
+MCPGuard            →  Runtime security proxy for MCP/A2A protocols.
+```
+
+- [Palisade Scanner](https://github.com/Carlos-Projects/palisade-scanner) — Scan web content for prompt injection and adversarial content
+- [MCPwn](https://github.com/Carlos-Projects/mcpwn) — Offensive security testing framework for MCP servers
+- [MCPscop](https://github.com/Carlos-Projects/mcpscope) — Unified security dashboard for MCP/A2A scanner results
+- [MCPGuard](https://github.com/Carlos-Projects/mcpguard) — Runtime security proxy for MCP/A2A protocols
 
 ---
 
