@@ -1,4 +1,27 @@
-# Contributing
+# Contributing to AgentGate
+
+👋 **Welcome to AgentGate!**
+
+Thank you for your interest in building policy-based firewall and honeypot middleware for AI agents. Your contributions — whether code, docs, ideas, or bug reports — are what make this project great. We're excited to have you with us!
+
+## First Time Contributor?
+
+New to TypeScript or security middleware? No problem!
+
+- Look for `good first issue` or `help wanted` labels
+- Improve test coverage or add edge case tests
+- Add a new policy rule example
+- Fix a typo or improve documentation
+
+Every contribution helps, no matter how small. We're here to guide you.
+
+## Need Help?
+
+Got a question or hit a wall?
+
+- Open a [GitHub Issue](https://github.com/Carlos-Projects/agentgate/issues)
+- Search existing issues for answers
+- Include details: Node version, OS, what you tried
 
 ## Development Setup
 
@@ -37,3 +60,7 @@ Before submitting a PR, ensure:
 2. Keep PRs focused on a single change
 3. Reference related issues
 4. Squash commits before merging
+
+---
+
+💡 This project is governed by a [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold its principles.
