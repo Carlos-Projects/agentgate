@@ -5,6 +5,7 @@
 [![TypeScript](https://img.shields.io/badge/types-TypeScript-blue?logo=typescript)](https://www.typescriptlang.org)
 [![License](https://img.shields.io/github/license/Carlos-Projects/agentgate?logo=opensourceinitiative)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/Carlos-Projects/agentgate?style=social)](https://github.com/Carlos-Projects/agentgate)
+[![Star History](https://img.shields.io/badge/Star-History-blue?style=social)](https://api.star-history.com/svg?repos=Carlos-Projects/agentgate&type=Date)
 
 **Policy-based firewall and honeypot middleware for AI agents accessing websites**
 
